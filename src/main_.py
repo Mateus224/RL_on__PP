@@ -1,12 +1,13 @@
 
 # -*- coding: utf-8 -*-
+
 import os
 import sys
 import PyKDL
 import torch
 import argparse
 import configparser
-import open3d
+#import open3d
 from env3d.agent.transition import Transition
 import env3d.settings
 
@@ -17,6 +18,7 @@ import run
 from env3d.env import Env
 from env3d.agent.transition import Transition
 from pcl_policy.pcl_rainbow.rainbow import PCL_rainbow
+from pcl_policy.greedy.greedy import Greedy
 
 def parse():
     parser = argparse.ArgumentParser(description="MLDS&ADL HW3")
@@ -38,12 +40,12 @@ def parse():
     parser.add_argument('--learn-start', type=int, default=int(20e3), metavar='STEPS', help='Number of steps before starting training')
     parser.add_argument('--evaluation-interval', type=int, default=12000, metavar='STEPS', help='Number of training steps between evaluations')
     parser.add_argument('--target-update', type=int, default=int(8e3), metavar='τ', help='Number of steps after which to update target network')
-    parser.add_argument('--id', type=str, default='3Dexperiment', help='Experiment ID')
-    parser.add_argument('--model_path', type=str, default = "results/3Dexperiment/checkpoint.pth", help='model used during testing / visulization') #testmoreFilters.h5
+    parser.add_argument('--id', type=str, default='ownAttention', help='Experiment ID')
+    parser.add_argument('--model_path', type=str, default = "results/PCT/checkpoint.pth", help='model used during testing / visulization') #testmoreFilters.h5
     parser.add_argument('--exp_name', type=str, default = "", help='')
     parser.add_argument('--frame_width', type=int, default = 84, help='Resized frame width')
     parser.add_argument('--frame_height', type=int, default = 84, help='Resized frame height')
-    parser.add_argument('--num_steps', type=int, default = 5e5, help='Number of episodes the agent plays')
+    parser.add_argument('--num_steps', type=int, default = 2e6, help='Number of episodes the agent plays')
     parser.add_argument('--state_length', type=int, default = 4, help='Number of most recent frames to produce the input to the network')
     parser.add_argument('--gamma', type=float, default = 0.99, help='Discount factor')
     parser.add_argument('--exploration_steps', type=int, default =50000, help='Number of steps over which the initial value of epsilon is linearly annealed to its final value')#100000
@@ -78,7 +80,7 @@ def parse():
     parser.add_argument('-dpi', '--resolution', default=75, type=int, help='resolution (dpi)')
     parser.add_argument('-s', '--save_dir', default='./movies/', type=str, help='dir to save agent logs and checkpoints')
     parser.add_argument('-p', '--prefix', default='default', type=str, help='prefix to help make video name unique')
-
+    parser.add_argument('--greedy', action='store_true', help="run greedy agent")
     try:
         from argument import add_arguments
         parser = add_arguments(parser)
@@ -108,8 +110,9 @@ if __name__ == '__main__':
     metrics = {'steps': [], 'rewards': [], 'entropy': []}
     
     env = Env(args, config)
-    if True:
+    if not args.greedy:
         
         agent = PCL_rainbow(args, env)
-    print('aba')
+    else:
+        agent = Greedy(args, env, action_space=6)
     run.init(args, env, agent, config)

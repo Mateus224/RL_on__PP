@@ -32,12 +32,12 @@ class Scene_settings():
         random_pose=config.getboolean('Agent01', 'random_pose')
         self.create_environment()
 
-        rospy.init_node('RL_agent',log_level=rospy.INFO)
+        rospy.init_node('RL_agent_test',log_level=rospy.INFO)
 
         self.initial_pose = Pose()
         if random_pose:
-            self.pose_[0]= np.random.randint(10)
-            self.pose_[1]= np.random.randint(10)
+            self.pose_[0]= np.random.randint(10)+1
+            self.pose_[1]= np.random.randint(10)+1
             self.pose_[2]= 1
             self.quat = tf.transformations.quaternion_from_euler(
                    float(0),float(0),float(0))
@@ -80,8 +80,8 @@ class Scene_settings():
 
     def __init__gazebo(self):
         server = Server()  
-        server.create_simulation('pcg-example')
-        simulation = server.get_simulation('pcg-example')
+        server.create_simulation('pcg-example2')
+        simulation = server.get_simulation('pcg-example2')
         tf2_ros.StaticTransformBroadcaster()
         #rospy.init_node('insert_object',log_level=rospy.INFO)
         simulation.create_gazebo_empty_world_task()
@@ -136,6 +136,34 @@ class Scene_settings():
             reference_frame='world'
         )
 
+    def __init__spawnWall_x(self, i):
+        _obj=Pose()
+        _obj.position.x = 6
+        _obj.position.y = -0.5+(i*13)
+        _obj.position.z = 1
+        spawn_model_client = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
+        spawn_model_client(
+        model_name='wall_x'+str(i),
+            model_xml=open('/home/matthias/catkin_ws/src/my_drone/urdf/wall_x.sdf', 'r').read(),
+            robot_namespace='/wall_x',
+            initial_pose=_obj,
+            reference_frame='world'
+        )
+
+    def __init__spawnWall_y(self, i):
+        _obj=Pose()
+        _obj.position.x = -0.5+(i*13)
+        _obj.position.y =  6
+        _obj.position.z = 1
+        spawn_model_client = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
+        spawn_model_client(
+        model_name='wall_y'+str(i),
+            model_xml=open('/home/matthias/catkin_ws/src/my_drone/urdf/wall_y.sdf', 'r').read(),
+            robot_namespace='/wall_x',
+            initial_pose=_obj,
+            reference_frame='world'
+        )
+
 
     def set_pose(self, name, position):
         rospy.wait_for_service('/gazebo/set_model_state')
@@ -159,16 +187,28 @@ class Scene_settings():
     
 
     def create_environment(self):
-        env_2D= np.random.choice(2, 100, p=(0.98, 0.02))
-        env_2D[np.random.randint(40)]=1
-        self.env_2D= env_2D.reshape((10,10))
+        #env_2D= np.random.choice(2, 100, p=(0.98, 0.02))
+        #env_2D[np.random.randint(40)]=1
+        #self.env_2D= env_2D.reshape((10,10))
+        self.env_2D=np.zeros((12,12))
+        x_y = np.random.randint(1,9, size=2)
+        x_y1 = np.random.randint(1,9, size=2)
+        if np.array_equal(x_y, x_y1):
+             x_y1=np.random.randint(1,9, size=2)
+             if np.array_equal(x_y, x_y1):
+                x_y1=np.random.randint(1,9, size=2)
+        self.env_2D[x_y[0],x_y[1]]=1
+        self.env_2D[x_y1[0],x_y1[1]]=1
         for i in range(35):
             self.__init__spawnObject(i) 
-
+        for i in range(2):
+            self.__init__spawnWall_x(i) 
+            self.__init__spawnWall_y(i)
         return 
 
 
-    def reset(self):
+    def reset(self, pose=None):
+        self.env_2D=np.zeros((12,12))
         position=np.zeros((7))
         zylinder="zylinder"
         for i in range(35):
@@ -177,9 +217,15 @@ class Scene_settings():
             position[2] = 0
             position[3] = 1
             self.set_pose(zylinder+str(i),position)            
-        env_2D= np.random.choice(2, 100, p=(0.98, 0.02))
-        env_2D[np.random.randint(40)]=1
-        self.env_2D= env_2D.reshape((10,10))
+        #env_2D= np.random.choice(2, 100, p=(0.98, 0.02))
+        x_y = np.random.randint(2,10, size=2)
+        x_y1 = np.random.randint(2,10, size=2)
+        if np.array_equal(x_y, x_y1):
+             x_y1=np.random.randint(2,10, size=2)
+             if np.array_equal(x_y, x_y1):
+                x_y1=np.random.randint(2,10, size=2)
+        self.env_2D[x_y[0],x_y[1]]=1
+        self.env_2D[x_y1[0],x_y1[1]]=1
         o_place=np.where(self.env_2D==1)
         o_place=np.array(o_place)
         self.num_obj=o_place.shape[1]
@@ -192,14 +238,18 @@ class Scene_settings():
             position[3] = 1
             self.set_pose(zylinder+str(i),position)
         agent="UAV"
-        check=True
-        while(check):
-            self.pose_[0]= np.random.randint(10)
-            self.pose_[1]= np.random.randint(10)
-            if self.env_2D[self.pose_[0]][self.pose_[1]] != 1:
-                check=False
-            else: 
-                print('error works')
+        if pose== None:
+            check=True
+            while(check):
+                self.pose_[0]= np.random.randint(1,11)
+                self.pose_[1]= np.random.randint(1,11)
+                if self.env_2D[self.pose_[0]][self.pose_[1]] != 1:
+                    check=False
+                else: 
+                    print('error works')
+        else:
+            self.pose_[0]=pose[0]
+            self.pose_[1]=pose[1]
         self.pose_[2]= 1
         self.quat = tf.transformations.quaternion_from_euler(
                    float(0),float(0),float(0))

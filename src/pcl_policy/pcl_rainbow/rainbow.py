@@ -10,9 +10,11 @@ from torchsummary import summary
 from numpy.random import default_rng
 rng = default_rng(12345)
 
-#
+
 from pcl_policy.pcl_rainbow.model import DQN, DQN_ResNet, ResBlock
 from pcl_policy.pcl_rainbow.pointNet_model import PointNet
+from pcl_policy.pcl_rainbow.pctNet_model import PCT_RL
+from pcl_policy.pcl_rainbow.multihead_transformer import RL_PNet
 
 from numpy.random import default_rng
 rng = default_rng(12345)
@@ -23,7 +25,7 @@ class PCL_rainbow():
     self.action_space = 6#env.action_space()
     self.atoms = args.atoms
     self.Vmin = 0#args.V_min
-    self.Vmax = 1024#args.V_max
+    self.Vmax = 480#args.V_max
     self.support = torch.linspace(self.Vmin, self.Vmax, self.atoms).to(device=args.device)  # Support (range) of z
     self.delta_z = (self.Vmax - self.Vmin) / (self.atoms - 1)
     self.batch_size = 32 #args.batch_size
@@ -32,9 +34,10 @@ class PCL_rainbow():
     #self.norm_clip = args.norm_clip
     self.norm_clip = 10
     self.device=args.device
-    
     #self.online_net = DQN(args, self.action_space).to(device=args.device)
-    self.online_net = PointNet(args, self.action_space).to(self.device)
+    #self.online_net = PointNet(args, self.action_space).to(self.device)
+    self.online_net = RL_PNet(args, self.action_space).to(self.device)
+    #self.online_net = PCT_RL(args, self.action_space).to(self.device)
     #summary(self.online_net, [(3, 1024),(1,7)])
     if args.load_net:  # Load pretrained model if provided
       if os.path.isfile(args.model_path):
@@ -53,7 +56,9 @@ class PCL_rainbow():
     self.online_net.train()
 
     #self.target_net = DQN(args, self.action_space).to(device=args.device)
-    self.target_net = PointNet(args, self.action_space).to(self.device)
+    #self.target_net = PointNet(args, self.action_space).to(self.device)
+    self.target_net = RL_PNet(args, self.action_space).to(self.device)
+    #self.target_net = PCT_RL(args, self.action_space).to(self.device)
     self.update_target_net()
     self.target_net.train()
     for param in self.target_net.parameters():
@@ -72,7 +77,8 @@ class PCL_rainbow():
     state_pcl=torch.Tensor(state[0]).to(device=self.device)
     state_pose=torch.Tensor(state[1]).to(device=self.device)
     with torch.no_grad():
-      return torch.squeeze((self.online_net(state_pcl.unsqueeze(0), state_pose.unsqueeze(0))[0] * self.support).sum(2)).cpu().detach().numpy()
+      #print(self.online_net(state_pcl.unsqueeze(0), state_pose.unsqueeze(0)).shape)
+      return torch.squeeze((self.online_net(state_pcl.unsqueeze(0), state_pose.unsqueeze(0)) * self.support).sum(2)).cpu().detach().numpy()
       #return (self.online_net(state_pcl.unsqueeze(0), state_pose.unsqueeze(0))[0] * self.support).sum(2).argmax(1).item()
 
   # Acts with an ε-greedy policy (used for evaluation only)
@@ -85,18 +91,18 @@ class PCL_rainbow():
     idxs, pcl_states, pose_states, actions, returns, next_pcl_states, next_pose_states, nonterminals, weights = mem.sample(self.batch_size)
 
     # Calculate current state probabilities (online network noise already sampled)
-    log_ps, matrix3x3, matrix64x64 = self.online_net(pcl_states, pose_states, log=True)  # Log probabilities log p(s_t, ·; θonline)
+    log_ps = self.online_net(pcl_states, pose_states, log=True)  # Log probabilities log p(s_t, ·; θonline)
     #log_ps=log_ps.squeeze(0)
     log_ps_a = log_ps[range(self.batch_size), actions]  # log p(s_t, a_t; θonline) log_ps[:,:, 1]
     
     #print('---ssssss-', log_ps_a.shape)
     with torch.no_grad():
       # Calculate nth next state probabilities
-      pns, matrix3x3, matrix64x64 = self.online_net(next_pcl_states, next_pose_states)  # Probabilities p(s_t+n, ·; θonline)
+      pns = self.online_net(next_pcl_states, next_pose_states)  # Probabilities p(s_t+n, ·; θonline)
       dns = self.support.expand_as(pns) * pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
       argmax_indices_ns = dns.sum(2).argmax(1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
       self.target_net.reset_noise()  # Sample new target net noise
-      pns_, matrix3x3, matrix64x64 = self.target_net(next_pcl_states, next_pose_states)  # Probabilities p(s_t+n, ·; θtarget)
+      pns_ = self.target_net(next_pcl_states, next_pose_states)  # Probabilities p(s_t+n, ·; θtarget)
       pns_a = pns_[range(self.batch_size), argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
       # Compute Tz (Bellman operator T applied to z)
       Tz = returns.unsqueeze(1) + nonterminals * (self.discount ** self.n) * self.support.unsqueeze(0)  # Tz = R^n + (γ^n)z (accounting for terminal states)
@@ -140,9 +146,8 @@ class PCL_rainbow():
 
 
   def epsilon_greedy(self, T, max, state):
-    if (max>T):
-      prob=(max-T)/max
-
+    if (max>0):
+      prob=((max-T)/max)
       if rng.random()<prob:
         action=torch.rand(self.action_space)
       else:

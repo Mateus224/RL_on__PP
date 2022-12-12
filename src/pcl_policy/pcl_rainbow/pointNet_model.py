@@ -1,29 +1,14 @@
 import time
-
+from pcl_policy.pcl_rainbow.module import Embedding, NeighborEmbedding, OA, SA
 from datetime import datetime
 
 import torch
-from torch_geometric.nn import MessagePassing
 import torch.nn as nn
 
 
-from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter()
-
-from torch_geometric.transforms import SamplePoints
-
 import torch.nn.functional as F
 from torch_cluster import knn_graph
-from torch_geometric.nn import global_max_pool
 
-from torch_geometric.datasets import GeometricShapes
-
-from torch_geometric.datasets import ModelNet
-from torch_geometric.transforms import Compose
-from torch_geometric.transforms import SamplePoints
-from torch_geometric.transforms import RandomRotate
-from torch_geometric.transforms import NormalizeScale
-from torch_geometric.loader import DataLoader
 from torch.nn.utils import spectral_norm
 
 import os
@@ -135,25 +120,101 @@ class Transform(nn.Module):
         self.bn2 = nn.BatchNorm1d(128)
         self.bn3 = nn.BatchNorm1d(1024)
 
+        self.conv1_seg = torch.nn.Conv1d(1088, 512, 1)
+        self.conv2_seg = torch.nn.Conv1d(512, 256, 1)
+        self.conv3_seg = torch.nn.Conv1d(256, 128, 1)
+        self.bn1_seg = nn.BatchNorm1d(512)
+        self.bn2_seg = nn.BatchNorm1d(256)
+        self.bn3_seg = nn.BatchNorm1d(128)
+
+
     def forward(self, input):
+        b, f, n = input.size() 
         matrix3x3 = self.input_transform(input)
         # batch matrix multiplication
         xb = torch.bmm(torch.transpose(input,1,2), matrix3x3).transpose(1,2)
-
         xb = F.relu(self.bn1(self.conv1(xb)))
-
+        print(xb.shape)
         matrix64x64 = self.feature_transform(xb)
         xb = torch.bmm(torch.transpose(xb,1,2), matrix64x64).transpose(1,2)
-
+        features=xb
         xb = F.relu(self.bn2(self.conv2(xb)))
         xb = self.bn3(self.conv3(xb))
 
         
         xb = nn.MaxPool1d(xb.size(-1))(xb)
-        output = nn.Flatten(1)(xb)
+        xb = xb.view(-1, 1024)
 
-        #return xb, matrix3x3, matrix64x64
+        xb = xb.view(-1, 1024, 1).repeat(1, 1, n)
+        output_1= torch.cat([xb, features], 1)
+
+        output_1 = F.relu(self.bn1_seg(self.conv1_seg(output_1)))
+        output_1 = F.relu(self.bn2_seg(self.conv2_seg(output_1)))
+        output_1 = F.relu(self.bn3_seg(self.conv3_seg(output_1)))
+
+        output = nn.Flatten(1)(output_1)
+
+
         return output, matrix3x3, matrix64x64
+
+class Transformers(nn.Module):
+    def __init__(self,k_transform):
+        super().__init__()
+        self.input_transform = Tnet(k=k_transform)
+        self.feature_transform = Tnet(k=64)
+        self.conv1 = nn.Conv1d(k_transform,256,1)
+        self.conv2 = nn.Conv1d(64,128,1)
+        self.conv3 = nn.Conv1d(128,1024,1)
+
+
+        self.bn1 = nn.BatchNorm1d(256)
+        self.bn2 = nn.BatchNorm1d(128)
+        self.bn3 = nn.BatchNorm1d(1024)
+
+        self.conv1_seg = torch.nn.Conv1d(2048, 512, 1)
+        self.conv2_seg = torch.nn.Conv1d(512, 256, 1)
+        self.conv3_seg = torch.nn.Conv1d(256, 128, 1)
+        self.bn1_seg = nn.BatchNorm1d(512)
+        self.bn2_seg = nn.BatchNorm1d(256)
+        self.bn3_seg = nn.BatchNorm1d(128)
+
+        self.oa1 = OA(256)
+        self.oa2 = OA(256)
+        self.oa3 = OA(256)
+        self.oa4 = OA(256)
+
+        self.linear = nn.Sequential(
+            nn.Conv1d(1280, 1024, kernel_size=1, bias=False),
+            nn.BatchNorm1d(1024),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+
+
+    def forward(self, input):
+        b, f, n = input.size() 
+        matrix3x3 = self.input_transform(input)
+        xb = torch.bmm(torch.transpose(input,1,2), matrix3x3).transpose(1,2)
+        xb = F.relu(self.bn1(self.conv1(xb)))
+        x1 = self.oa1(xb)
+        x2 = self.oa2(x1)
+        x3 = self.oa3(x2)
+        x4 = self.oa4(x3)
+        x = torch.cat([xb, x1, x2, x3, x4], dim=1)
+
+        x = self.linear(x)
+ 
+        xs = nn.MaxPool1d(x.size(-1))(x)
+
+        xs = xs.view(-1, 1024, 1).repeat(1, 1, n)
+        output_1= torch.cat([xs, x], 1)
+        output_1 = F.relu(self.bn1_seg(self.conv1_seg(output_1)))
+        output_1 = F.relu(self.bn2_seg(self.conv2_seg(output_1)))
+        output_1 = F.relu(self.bn3_seg(self.conv3_seg(output_1)))
+
+        output = nn.Flatten(1)(output_1)
+
+
+        return output
 
 class PointNet(nn.Module):
     def __init__(self, args, action_space ,nr_features=3):
@@ -161,13 +222,10 @@ class PointNet(nn.Module):
         self.atoms = 51
         torch.backends.cudnn.enabled = False
         self.action_space = action_space
-        self.transform = Transform(k_transform=nr_features)
+        self.transform = Transformers(k_transform=nr_features)
 
-        self.fc1 = nn.Linear(1024, 512)
+        self.fc1 = nn.Linear(65536, 512)
         self.fc2 = nn.Linear(519, 512)
-
-        #self.fc2 = nn.Linear(512, 256)
-        #self.fc3 = nn.Linear(256, num_classes)
         
 
         self.bn1 = nn.BatchNorm1d(512)
@@ -180,7 +238,8 @@ class PointNet(nn.Module):
         self.logsoftmax = nn.LogSoftmax(dim=1)
 
     def forward(self, pcl, pose, log=False):
-        xb, matrix3x3, matrix64x64 = self.transform(pcl)
+        
+        xb = self.transform(pcl)
         xb = F.relu(self.bn1(self.fc1(xb)))
         xb = torch.flatten(xb, start_dim=1)
         pose = torch.flatten(pose, start_dim=1)
@@ -202,7 +261,7 @@ class PointNet(nn.Module):
             
             q_uuv = F.softmax(q_uuv, dim=2)  # Probabilities with action over second dimension
         #return  q_uuv #q_uav,
-        return q_uuv, matrix3x3, matrix64x64
+        return q_uuv#, matrix3x3, matrix64x64
 
     
     def reset_noise(self):
