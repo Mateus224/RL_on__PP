@@ -154,9 +154,9 @@ class Transition():
         points_wall = np.copy(np.asarray(self.pcd.points))
         mask_glob = points_1[:,2] > 0.02
         mask_globx0 = points_1[:,0] > 0.1
-        mask_globx1 = points_1[:,0] < 9.9
+        mask_globx1 = points_1[:,0] < 11.9
         mask_globy0 = points_1[:,1] > 0.1
-        mask_globy1 = points_1[:,1] < 9.9        
+        mask_globy1 = points_1[:,1] < 11.9        
 
 
         mask_ground = points_2[:,2] < 0.02 
@@ -193,7 +193,7 @@ class Transition():
 
         self.ground_points = self.ground_points.voxel_down_sample(voxel_size=0.9)
         self.pcd = self.pcd.voxel_down_sample(voxel_size=0.2)
-        self.wall_points = self.wall_points.voxel_down_sample(voxel_size=0.9)
+        self.wall_points = self.wall_points.voxel_down_sample(voxel_size=1.4)
         
         self.sub_reward=np.asarray(self.wall_points.points).shape[0] # substract from reward
         self.diff = self.sub_reward - self.sub_reward_old

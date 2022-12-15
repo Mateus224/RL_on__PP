@@ -218,8 +218,8 @@ class Scene_settings():
             position[3] = 1
             self.set_pose(zylinder+str(i),position)            
         #env_2D= np.random.choice(2, 100, p=(0.98, 0.02))
-        x_y = np.random.randint(2,10, size=2)
-        x_y1 = np.random.randint(2,10, size=2)
+        x_y = np.random.randint(2,11, size=2)
+        x_y1 = np.random.randint(2,11, size=2)
         if np.array_equal(x_y, x_y1):
              x_y1=np.random.randint(2,10, size=2)
              if np.array_equal(x_y, x_y1):

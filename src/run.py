@@ -61,7 +61,7 @@ def init(args,env, agent,config):
                     done=False
                     timeout= False
                     
-                action = agent.epsilon_greedy(T,500000, state)
+                action = agent.epsilon_greedy(T,200000, state)
 
 
                 agent.reset_noise()  # Draw a new set of noisy weights
@@ -78,7 +78,7 @@ def init(args,env, agent,config):
                         mem.append(state, actions[j], 0, True)
                 #print(state[0].shape)
                 mem.append(state, actions[i], reward, False) 
-                if T >= 1000:#args.learn_start:
+                if T >= 15000:#args.learn_start:
                     mem.priority_weight = min(mem.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
 
                     agent.learn(mem)  # Train with n-step distributional double-Q learning

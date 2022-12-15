@@ -36,8 +36,8 @@ class PCL_rainbow():
     self.device=args.device
     #self.online_net = DQN(args, self.action_space).to(device=args.device)
     #self.online_net = PointNet(args, self.action_space).to(self.device)
-    self.online_net = RL_PNet(args, self.action_space).to(self.device)
-    #self.online_net = PCT_RL(args, self.action_space).to(self.device)
+    #self.online_net = RL_PNet(args, self.action_space).to(self.device)
+    self.online_net = PCT_RL(args, self.action_space).to(self.device)
     #summary(self.online_net, [(3, 1024),(1,7)])
     if args.load_net:  # Load pretrained model if provided
       if os.path.isfile(args.model_path):
@@ -57,8 +57,8 @@ class PCL_rainbow():
 
     #self.target_net = DQN(args, self.action_space).to(device=args.device)
     #self.target_net = PointNet(args, self.action_space).to(self.device)
-    self.target_net = RL_PNet(args, self.action_space).to(self.device)
-    #self.target_net = PCT_RL(args, self.action_space).to(self.device)
+    #self.target_net = RL_PNet(args, self.action_space).to(self.device)
+    self.target_net = PCT_RL(args, self.action_space).to(self.device)
     self.update_target_net()
     self.target_net.train()
     for param in self.target_net.parameters():

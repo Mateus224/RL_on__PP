@@ -122,15 +122,15 @@ class PCT(nn.Module):
         super().__init__()
 
         #self.neighbor_embedding = NeighborEmbedding(samples)
-        self.neighbor_embedding = Embedding(3,256)
-        self.oa1 = OA(256)
-        self.oa2 = OA(256)
-        self.oa3 = OA(256)
-        self.oa4 = OA(256)
+        self.neighbor_embedding = Embedding(3,128)
+        self.oa1 = OA(128)
+        self.oa2 = OA(128)
+        self.oa3 = OA(128)
+        self.oa4 = OA(128)
 
         self.linear = nn.Sequential(
-            nn.Conv1d(1280, 1024, kernel_size=1, bias=False),
-            nn.BatchNorm1d(1024),
+            nn.Conv1d(640, 512, kernel_size=1, bias=False),
+            nn.BatchNorm1d(512),
             nn.LeakyReLU(negative_slope=0.2)
         )
 
@@ -144,13 +144,13 @@ class PCT(nn.Module):
         x = torch.cat([x, x1, x2, x3, x4], dim=1)
 
         x = self.linear(x)
-        c = nn.MaxPool1d(x.size(-1))(x)
-        c = c.view(-1, 1024)
+        #c = nn.MaxPool1d(x.size(-1))(x)
+        #c = c.view(-1, 1024)
         #c = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
         x_max = torch.max(x, dim=-1)[0]
         x_mean = torch.mean(x, dim=-1)
 
-        return c, x_max, x_mean
+        return x, x_max, x_mean
 
 
 class Classification(nn.Module):
@@ -222,7 +222,7 @@ class Policy(nn.Module):
         self.action_space = actions
         self.atoms =args.atoms
 
-        self.convs1 = nn.Conv1d(1024 + 1024, 512, 1)
+        self.convs1 = nn.Conv1d(512 + 512, 512, 1)
         self.convs2 = nn.Conv1d(512, 256, 1)
         self.convs3 = nn.Conv1d(256, 128, 1)
 
@@ -233,15 +233,15 @@ class Policy(nn.Module):
         self.fc1 = nn.Linear(65536, 512)
         self.fc2 = nn.Linear(519, 512)
 
-        self.fc_h_v = spectral_norm(nn.Linear(512, 512))
-        self.fc_h_a = spectral_norm(nn.Linear(512, 512))
+        self.fc_h_v = spectral_norm(nn.Linear(65536, 512))
+        self.fc_h_a = spectral_norm(nn.Linear(65536, 512))
         self.fc_z_v = NoisyLinear(512, self.atoms, std_init=args.noisy_std)
         self.fc_z_a = NoisyLinear(512, self.action_space * self.atoms, std_init=args.noisy_std)
 
     
     def forward(self, x, c, a, p, log=False):
         batch_size, a, N = x.size()
-        c = c.view(-1, 1024, 1).repeat(1, 1, N)
+        c = c.view(-1, 512, 1).repeat(1, 1, N)
         #a = c.view(-1, 1024, 1).repeat(1, 1, N)
         #p = p.view(-1, 7, 1).repeat(1, 1, N)
         x = torch.cat([x,c], dim=1)  # 1024 * 3 + 64
@@ -249,9 +249,9 @@ class Policy(nn.Module):
         x = F.relu(self.convs2(x))
         x = F.relu(self.convs3(x))
         xb = torch.flatten(x, start_dim=1)
-        xb = F.relu(self.fc1(xb))
-        xb = torch.cat([xb,p], dim=1)
-        xb = F.relu(self.fc2(xb))
+        #xb = F.relu(self.fc1(xb))
+        #xb = torch.cat([xb,p], dim=1)
+        #xb = F.relu(self.fc2(xb))
         
         v=self.fc_h_v(xb)
         v_uuv = self.fc_z_v(F.relu(v))  # Value stream
