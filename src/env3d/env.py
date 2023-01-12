@@ -38,12 +38,19 @@ class Env(object):
 
     def step(self, unsorted_actions):
         pcl=None
+        terminate=False
         pcl_state= np.zeros((3,self.pcl_size))
         actions, i = self.transition.legal_transition(unsorted_actions)
         pcl, pose = self.transition.make_action(actions[i])
         pcl=np.swapaxes(pcl,0,1)
-        pcl_state[:,:pcl.shape[1]]=pcl
+        if pcl.shape[1]>511:
+            terminate=True
+            print("too many points !!!", pcl.shape)
+        else:
+            pcl_state[:,:pcl.shape[1]]=pcl
         state=[pcl_state, pose]
+        #if state.shape[0]>512:
+
 
         if self.old_pcl.shape[1] < pcl.shape[1]:
             reward=pcl.shape[1]-self.old_pcl.shape[1]
@@ -52,7 +59,7 @@ class Env(object):
         else:
             reward=0
 
-        return state, reward, actions, i, False
+        return state, reward, actions, i, terminate
 
     def simulate_step(self, action):
         pcl= np.zeros((3,0))

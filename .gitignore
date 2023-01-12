@@ -6,8 +6,9 @@ __pycache__/
 
 *$py.class
 
+*.pyc
 
-
+src/**/__pycache__/
 # C extensions
 
 *.so
@@ -259,3 +260,4 @@ dmypy.json
 
 #Other
 src/runs/
+src/results/

@@ -14,7 +14,6 @@ from pcl_policy.greedy.greedy import Greedy
 
 
 def init(args,env, agent,config):
-    
     if True:
         if type(agent) == Greedy:
             writer = SummaryWriter()
@@ -46,30 +45,39 @@ def init(args,env, agent,config):
             results_dir = os.path.join('results', args.id)
             if not os.path.exists(results_dir):
                 os.makedirs(results_dir)
-            T, done = 0, False
+            T, t, done = 0, 0, False
             sum_reward=0
             state, _ = env.reset()
             for T in trange(1,int(args.num_steps)):#int(args.num_steps)):
-                if T%65==0:
+                t=t+1
+                if done:
+                    t=65
+                if t%65==0:
                     episode+=1
                     timeout= True
-                if done or timeout:
+                    t=0
+                
+                if timeout:
                     writer.add_scalar("Reward", sum_reward, episode)
                     print("Reward:" ,sum_reward)#,(sum_reward+(0.35*done))/(env.start_entr_map))
                     sum_reward=0
                     state, _ = env.reset()
                     done=False
                     timeout= False
-                    
+                
                 action = agent.epsilon_greedy(T,200000, state)
+                #print(action)
 
 
                 agent.reset_noise()  # Draw a new set of noisy weights
 
 
                 next_state, reward, actions, i, done = env.step(action)  # Step
-
+                
+                if done:
+                    print(400, 'asdasd', reward, False, i)
                 sum_reward=sum_reward+reward
+                #print("reward:",reward, sum_reward)
                  # Append transition to memory
 
                 # Train and test
@@ -77,7 +85,7 @@ def init(args,env, agent,config):
                     for j in range(i-1):
                         mem.append(state, actions[j], 0, True)
                 #print(state[0].shape)
-                mem.append(state, actions[i], reward, False) 
+                mem.append(state, actions[i], reward, done) 
                 if T >= 15000:#args.learn_start:
                     mem.priority_weight = min(mem.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
 

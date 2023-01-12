@@ -206,6 +206,7 @@ class Transition():
         pc2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
         
         self.pub.publish(pc2)
+        rospy.sleep(0.002)
         self.step+=1
         return self.global_pcl
         
@@ -247,11 +248,11 @@ class Transition():
 
 
         self.scene.set_pose("UAV",self.position)
+        rospy.sleep(0.002)
         pcl=self.get_pcl()
         pcl2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
         transformedPc2 = self.transform_cloud_toAgent(pcl2)
         transformedPc2.header.stamp = rospy.Time.now()
-        #rospy.sleep(0.2)
         #self.pub_agent.publish(transformedPc2)
         #rospy.sleep(0.2)
         transformed_pcl = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(transformedPc2, remove_nans = True)
@@ -345,7 +346,7 @@ class Transition():
 
         #print(self.position)
         self.scene.set_pose("UAV",position)
-        rospy.sleep(0.05)
+        rospy.sleep(0.002)
         pcl=self.get_simulated_pcl()
         self.scene.set_pose("UAV",self.position)
         return pcl

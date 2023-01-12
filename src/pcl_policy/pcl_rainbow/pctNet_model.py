@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pcl_policy.pcl_rainbow.module import Embedding, NeighborEmbedding, OA, SA
+from pcl_policy.pcl_rainbow.module import Embedding, NeighborEmbedding, OA, OAO, SA
 from torch.nn.utils import spectral_norm
 import math
 
@@ -142,7 +142,6 @@ class PCT(nn.Module):
         x4 = self.oa4(x3)
 
         x = torch.cat([x, x1, x2, x3, x4], dim=1)
-
         x = self.linear(x)
         #c = nn.MaxPool1d(x.size(-1))(x)
         #c = c.view(-1, 1024)
@@ -396,6 +395,279 @@ class PCT_RL(nn.Module):
     def forward(self, x, position, log=False):
         x,c, a = self.encoder(x)
         x = self.pol(x, c, a, position, log)
+        return x
+
+    def reset_noise(self):
+        for name, module in self.named_children():
+            if 'fc_z' in name:
+                module.reset_noise()
+
+class Conv_transformer(nn.Module):
+    def __init__(self, samples=[512, 256]):
+        super().__init__()
+
+        #self.neighbor_embedding = NeighborEmbedding(samples)
+        self.neighbor_embedding = Embedding(3,256)
+
+        self.oa11 = OAO(64)
+        self.oa12 = OAO(64)
+        self.oa13 = OAO(64)
+        self.oa14 = OAO(64)
+
+        self.oa21 = OA(192)
+        self.oa22 = OAO(192)
+
+        self.oa23 = OA(192)
+        self.oa24 = OAO(192)
+
+        self.oa31 = OA(960)
+        self.oa32 = OAO(960)
+
+
+
+        self.linearLayer_weights_11 = nn.Conv1d(384, 384, kernel_size=1, bias=False)
+        self.linearLayer_weights_12 = nn.Conv1d(384, 384, kernel_size=1, bias=False)
+
+        self.linearLayer_weights_2 = nn.Conv1d(960, 960, kernel_size=1, bias=False)
+        self.linearLayer_weights_3 = nn.Conv1d(2400, 1024, kernel_size=1, bias=False)
+        self.linearLayer_weights_4 = nn.Conv1d(320, 64, kernel_size=1, bias=False)
+
+        self.linearLayer_1 = nn.Sequential(
+            nn.Conv1d(256, 256, kernel_size=1, bias=False),
+            nn.BatchNorm1d(256),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+        self.Hoa=OA(256)
+
+        self.linearLayer_2 = nn.Sequential(
+            nn.Conv1d(256, 256, kernel_size=1, bias=False),
+            nn.BatchNorm1d(256),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+
+    def forward(self, x):
+        x = self.neighbor_embedding(x)
+
+        x01 = x.narrow(1,0,64)
+        x02 = x.narrow(1,64,64)
+        x03 = x.narrow(1,128,64)
+        x04 = x.narrow(1,192,64)
+ 
+        x11 = self.oa11(x01)
+        x12 = self.oa12(x02)
+        x13 = self.oa13(x03)
+        x14 = self.oa14(x04)
+
+
+        x_cat1 = torch.cat([x, x11, x12, x13, x14], dim=1)
+        #print(x_cat1.shape)
+        #x_cat2 = torch.cat([x03, x04, x13, x14], dim=1)
+
+        x_11 =  F.relu(self.linearLayer_weights_11(x_cat1))
+        #x_12 =  F.relu(self.linearLayer_weights_12(x_cat2))
+
+        x01 = x_11.narrow(1,0,192)
+        x02 = x_11.narrow(1,192,192)
+
+        x1 = self.oa21(x01)
+        x2 = self.oa22(x1)
+
+        x3 = self.oa23(x02)
+        x4 = self.oa24(x3)        
+
+        x_cat = torch.cat([x_11, x1, x2, x3, x4], dim=1)
+        x =  F.relu(self.linearLayer_weights_2(x_cat))
+
+        x1 = self.oa31(x)
+        x2 = self.oa32(x1)
+
+        x_cat = torch.cat([x, x1, x2], dim=1)
+        x =  F.relu(self.linearLayer_weights_3(x_cat))
+        """
+        x1 = self.oa13(x03)
+        x2 = self.oa23(x1)
+        x3 = self.oa33(x2)
+        x4 = self.oa43(x3)
+        x_cat = torch.cat([x03, x1, x2, x3, x4], dim=1)
+        x33 =  F.relu(self.linearLayer_weights_3(x_cat))
+
+        x1 = self.oa14(x04)
+        x2 = self.oa24(x1)
+        x3 = self.oa34(x2)
+        x4 = self.oa44(x3)
+        x_cat = torch.cat([x04, x1, x2, x3, x4], dim=1)
+        x44 =  F.relu(self.linearLayer_weights_4(x_cat))
+        
+        x_cat = torch.cat([x11, x22, x33, x44], dim=1)
+        f_x=self.linearLayer_1(x_cat)
+        f_x = self.Hoa(f_x)
+        x=self.linearLayer_2(f_x)
+
+        #c = nn.MaxPool1d(x.size(-1))(x)
+        #c = c.view(-1, 1024)
+        """
+        #c = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
+        
+        x_max = torch.max(x, dim=-1)[0]
+        #x_mean = torch.mean(x, dim=-1)
+        
+        return x , x_max#, x_mean
+
+class Multihead_PCT(nn.Module):
+    def __init__(self, samples=[512, 256]):
+        super().__init__()
+
+        #self.neighbor_embedding = NeighborEmbedding(samples)
+        self.neighbor_embedding = Embedding(3,256)
+
+        self.oa11 = OA(64)
+        self.oa21 = OA(64)
+        self.oa31 = OA(64)
+        self.oa41 = OA(64)
+
+        self.oa12 = OA(64)
+        self.oa22 = OA(64)
+        self.oa32 = OA(64)
+        self.oa42 = OA(64)
+
+        self.oa13 = OA(64)
+        self.oa23 = OA(64)
+        self.oa33 = OA(64)
+        self.oa43 = OA(64)
+
+        self.oa14 = OA(64)
+        self.oa24 = OA(64)
+        self.oa34 = OA(64)
+        self.oa44 = OA(64)
+
+        self.linearLayer_weights_1 = nn.Conv1d(256, 64, kernel_size=1, bias=False)
+        self.linearLayer_weights_2 = nn.Conv1d(256, 64, kernel_size=1, bias=False)
+        self.linearLayer_weights_3 = nn.Conv1d(256, 64, kernel_size=1, bias=False)
+        self.linearLayer_weights_4 = nn.Conv1d(256, 64, kernel_size=1, bias=False)
+
+        #self.linearLayer_weights_f = nn.Linear(4*64, 64, bias=False)
+        self.linear = nn.Sequential(
+            nn.Conv1d(256, 256, kernel_size=1),
+            nn.BatchNorm1d(256),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+
+    def forward(self, x):
+        x = self.neighbor_embedding(x)
+
+        x01 = x.narrow(1,0,64)
+        x02 = x.narrow(1,64,64)
+        x03 = x.narrow(1,128,64)
+        x04 = x.narrow(1,192,64)
+ 
+        x1 = self.oa11(x01)
+        x2 = self.oa21(x1)
+        x3 = self.oa31(x2)
+        x4 = self.oa41(x3)
+        x_cat = torch.cat([x01, x1, x2, x3], dim=1)
+        x11 =  F.relu(self.linearLayer_weights_1(x_cat))
+
+        x1 = self.oa12(x02)
+        x2 = self.oa22(x1)
+        x3 = self.oa32(x2)
+        x4 = self.oa42(x3)
+        x_cat = torch.cat([x02, x1, x2, x3], dim=1)
+        x22 =  F.relu(self.linearLayer_weights_2(x_cat))
+
+
+        x1 = self.oa13(x03)
+        x2 = self.oa23(x1)
+        x3 = self.oa33(x2)
+        x4 = self.oa43(x3)
+        x_cat = torch.cat([x03, x1, x2, x3], dim=1)
+        x33 =  F.relu(self.linearLayer_weights_3(x_cat))
+
+        x1 = self.oa14(x04)
+        x2 = self.oa24(x1)
+        x3 = self.oa34(x2)
+        x4 = self.oa44(x3)
+        x_cat = torch.cat([x04, x1, x2, x3], dim=1)
+        x44 =  F.relu(self.linearLayer_weights_4(x_cat))
+        
+        x_cat = torch.cat([x11, x22, x33, x44], dim=1)
+        x = self.linear(x_cat)
+
+        #c = nn.MaxPool1d(x.size(-1))(x)
+        #c = c.view(-1, 1024)122448Mr!
+        
+        #c = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
+        #x_max = torch.max(x, dim=-1)[0]
+        #x_mean = torch.mean(x, dim=-1)
+
+        return x #, x_max, x_mean
+
+class Policy2(nn.Module):
+    def __init__(self,args, actions):
+        super().__init__()
+
+        self.action_space = actions
+        self.atoms =args.atoms
+
+        self.convs1 = nn.Conv1d(2048, 1024, 1)
+        self.convs2 = nn.Conv1d(1024, 512, 1)
+        self.convs3 = nn.Conv1d(512, 256, 1)
+        self.convs4 = nn.Conv1d(256, 128, 1)
+
+        self.bns1 = nn.BatchNorm1d(128)
+        self.bns2 = nn.BatchNorm1d(64)
+        #self.bns3 = nn.BatchNorm1d(128)
+
+        self.fc1 = nn.Linear(65536, 512)
+        self.fc2 = nn.Linear(519, 512)
+
+        self.fc_h_v = spectral_norm(nn.Linear(65536, 512))
+        self.fc_h_a = spectral_norm(nn.Linear(65536, 512))
+        self.fc_z_v = NoisyLinear(512, self.atoms, std_init=args.noisy_std)
+        self.fc_z_a = NoisyLinear(512, self.action_space * self.atoms, std_init=args.noisy_std)
+
+    
+    def forward(self, x, m, log=False):
+        batch_size, a, N = x.size()
+        c = m.view(-1, a, 1).repeat(1, 1, N)
+        #a = c.view(-1, 1024, 1).repeat(1, 1, N)
+        #p = p.view(-1, 7, 1).repeat(1, 1, N)
+        x = torch.cat([x,c], dim=1)  # 1024 * 3 + 64
+        x = F.relu(self.convs1(x))
+        x = F.relu(self.convs2(x))
+        x = F.relu(self.convs3(x))
+        x = F.relu(self.convs4(x))
+        xb = torch.flatten(x, start_dim=1)
+        #xb = F.relu(self.fc1(xb))
+        #xb = torch.cat([xb,p], dim=1)
+        #xb = F.relu(self.fc2(xb))
+        
+        v=F.relu(self.fc_h_v(xb))
+        v_uuv = self.fc_z_v(F.relu(v))  # Value stream
+        a=F.relu(self.fc_h_a(xb))
+        a_uuv = self.fc_z_a(F.relu(a))  # Advantage stream
+
+        v_uuv, a_uuv = v_uuv.view(-1, 1, self.atoms), a_uuv.view(-1, self.action_space, self.atoms)
+        
+        q_uuv = v_uuv + a_uuv - a_uuv.mean(1, keepdim=True)  # Combine streams
+
+        if log:  # Use log softmax for numerical stability
+            x = F.log_softmax(q_uuv, dim=2)  # Log probabilities with action over second dimension
+        else:
+            
+            x = F.softmax(q_uuv, dim=2)  # Probabilities with action over second dimension
+        #return  q_uuv #q_uav,
+        return x
+
+class Multihead_PCT_RL(nn.Module):
+    def __init__(self, args, actions):
+        super().__init__()
+    
+        self.encoder = Conv_transformer()
+        self.policy2 = Policy2(args, actions)
+
+    def forward(self, x, position, log=False):
+        x, mean = self.encoder(x)
+        x = self.policy2(x, mean, log)
         return x
 
     def reset_noise(self):
