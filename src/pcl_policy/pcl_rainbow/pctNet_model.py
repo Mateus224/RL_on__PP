@@ -612,6 +612,7 @@ class Policy2(nn.Module):
         self.convs2 = nn.Conv1d(1024, 512, 1)
         self.convs3 = nn.Conv1d(512, 256, 1)
         self.convs4 = nn.Conv1d(256, 128, 1)
+        self.convs5 = nn.Conv1d(128, 64, 1)
 
         self.bns1 = nn.BatchNorm1d(128)
         self.bns2 = nn.BatchNorm1d(64)
@@ -620,8 +621,8 @@ class Policy2(nn.Module):
         self.fc1 = nn.Linear(65536, 512)
         self.fc2 = nn.Linear(519, 512)
 
-        self.fc_h_v = spectral_norm(nn.Linear(65536, 512))
-        self.fc_h_a = spectral_norm(nn.Linear(65536, 512))
+        self.fc_h_v = spectral_norm(nn.Linear(44800, 512))
+        self.fc_h_a = spectral_norm(nn.Linear(44800, 512))
         self.fc_z_v = NoisyLinear(512, self.atoms, std_init=args.noisy_std)
         self.fc_z_a = NoisyLinear(512, self.action_space * self.atoms, std_init=args.noisy_std)
 
@@ -636,6 +637,7 @@ class Policy2(nn.Module):
         x = F.relu(self.convs2(x))
         x = F.relu(self.convs3(x))
         x = F.relu(self.convs4(x))
+        x = F.relu(self.convs5(x))
         xb = torch.flatten(x, start_dim=1)
         #xb = F.relu(self.fc1(xb))
         #xb = torch.cat([xb,p], dim=1)

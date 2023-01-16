@@ -47,7 +47,7 @@ def init(args,env, agent,config):
                 os.makedirs(results_dir)
             T, t, done = 0, 0, False
             sum_reward=0
-            state, _ = env.reset()
+            state = env.reset()
             for T in trange(1,int(args.num_steps)):#int(args.num_steps)):
                 t=t+1
                 if done:
@@ -61,7 +61,7 @@ def init(args,env, agent,config):
                     writer.add_scalar("Reward", sum_reward, episode)
                     print("Reward:" ,sum_reward)#,(sum_reward+(0.35*done))/(env.start_entr_map))
                     sum_reward=0
-                    state, _ = env.reset()
+                    state = env.reset()
                     done=False
                     timeout= False
                 

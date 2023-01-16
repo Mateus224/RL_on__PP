@@ -15,7 +15,7 @@ class Env(object):
         self.scene=Scene_settings(config)
         self.transition=Transition(config,self.scene)
         self.config=config
-        self.pcl_size=512
+        self.pcl_size=700
 
         
 
@@ -29,8 +29,9 @@ class Env(object):
         self.transition.reset()
         self.old_pcl=np.zeros((1,3))
         state=[self.pcl, self.scene.quat_pose]
+        self.points=0
 
-        return state , 0
+        return state 
 
 
 
@@ -43,7 +44,8 @@ class Env(object):
         actions, i = self.transition.legal_transition(unsorted_actions)
         pcl, pose = self.transition.make_action(actions[i])
         pcl=np.swapaxes(pcl,0,1)
-        if pcl.shape[1]>511:
+        self.points=pcl.shape[1]
+        if pcl.shape[1]>699:
             terminate=True
             print("too many points !!!", pcl.shape)
         else:
@@ -51,13 +53,13 @@ class Env(object):
         state=[pcl_state, pose]
         #if state.shape[0]>512:
 
-
-        if self.old_pcl.shape[1] < pcl.shape[1]:
-            reward=pcl.shape[1]-self.old_pcl.shape[1]
-            reward = reward -  self.transition.diff
-            self.old_pcl=pcl
-        else:
-            reward=0
+        reward = self.transition.reward
+        #if self.old_pcl.shape[1] < pcl.shape[1]:
+        #    reward=pcl.shape[1]-self.old_pcl.shape[1]
+        #    reward = reward -  self.transition.diff
+        #    self.old_pcl=pcl
+        #else:
+        #    reward=0
 
         return state, reward, actions, i, terminate
 

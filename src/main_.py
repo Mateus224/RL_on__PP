@@ -40,8 +40,8 @@ def parse():
     parser.add_argument('--learn-start', type=int, default=int(20e3), metavar='STEPS', help='Number of steps before starting training')
     parser.add_argument('--evaluation-interval', type=int, default=12000, metavar='STEPS', help='Number of training steps between evaluations')
     parser.add_argument('--target-update', type=int, default=int(8e3), metavar='τ', help='Number of steps after which to update target network')
-    parser.add_argument('--id', type=str, default='ownAttention', help='Experiment ID')
-    parser.add_argument('--model_path', type=str, default = "results/ownAttention/checkpoint.pth", help='model used during testing / visulization') #testmoreFilters.h5
+    parser.add_argument('--id', type=str, default='ownAttentionv2', help='Experiment ID')
+    parser.add_argument('--model_path', type=str, default = "results/ownAttentionv2/checkpoint.pth", help='model used during testing / visulization') #testmoreFilters.h5
     parser.add_argument('--exp_name', type=str, default = "", help='')
     parser.add_argument('--frame_width', type=int, default = 84, help='Resized frame width')
     parser.add_argument('--frame_height', type=int, default = 84, help='Resized frame height')
@@ -64,7 +64,7 @@ def parse():
     parser.add_argument('--no_op_steps', type=int, default = 10, help='Maximum number of "do nothing" actions to be performed by the agent at the start of an episode')
     parser.add_argument('--save_network_path', type=str, default = "saved_dqn_networks/", help='')
     parser.add_argument('--save_summary_path', type=str, default = "dqn_summary/", help='')
-
+    parser.add_argument('--eval', action='store_true')
 
     parser.add_argument('--gpu_frac', type=float, default = 1.0, help='Set GPU use limit for tensorflow')
     parser.add_argument('--ddqn', type=bool, default = False, help='Set True to apply Double Q-learning')
@@ -111,8 +111,10 @@ if __name__ == '__main__':
     
     env = Env(args, config)
     if not args.greedy:
-        
         agent = PCL_rainbow(args, env)
     else:
         agent = Greedy(args, env, action_space=6)
-    run.init(args, env, agent, config)
+    if args.eval:
+        run.eval(args, env, agent, config)
+    else:
+        run.init(args, env, agent, config)
