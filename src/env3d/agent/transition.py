@@ -108,8 +108,6 @@ class Transition():
         
         x=self.position[0]+self.action_set[action][0]
         y=self.position[1]+self.action_set[action][1]
-        if (int(x)>11 or int(x)<1) or (int(y)>11 or int(y)<1):
-            return False
         if self.scene.env_2D[int(x),int(y)]>0:
             return False
         return True
@@ -261,9 +259,9 @@ class Transition():
 
         self.allT_objects=np.concatenate((self.np_objects, self.allT_objects),axis=0)
         self.objs.points = o3d.utility.Vector3dVector(self.allT_objects)
-        self.objs = self.objs.voxel_down_sample(voxel_size=0.22)
+        self.objs = self.objs.voxel_down_sample(voxel_size=0.25)
         self.allT_objects=np.copy(np.asarray(self.objs.points))
-        self.global_pcl=np.concatenate((self.allT_objects,np.copy(np.asarray(self.pcd.points))),axis=0)
+        self.global_pcl=np.concatenate((self.allT_objects,np.asarray(self.pcd.points)),axis=0)
 
         self.comulativ_reward= self.allT_objects.shape[0]
         self.reward = self.comulativ_reward - self.comulativ_old_reward
@@ -274,7 +272,7 @@ class Transition():
         self.exp_old_reward = self.exp_reward
         
 
-        self.reward=self.reward + (self.exp_reward_diff/5)
+        self.reward=self.reward + (self.exp_reward_diff/10)
 
 
         self.pcd.points = o3d.utility.Vector3dVector(self.global_pcl)
@@ -283,10 +281,11 @@ class Transition():
         pc2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
         
         self.pub.publish(pc2)
-        rospy.sleep(0.002)
+        
         transformedPc2 = self.transform_cloud_toAgent(pc2)
         transformedPc2.header.stamp = rospy.Time.now()
         transformed_pcl = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(transformedPc2, remove_nans = True)
+
         self.step+=1
         return transformed_pcl
         
@@ -325,9 +324,7 @@ class Transition():
         static_transformStamped.transform.rotation.w = self.position[3]
 
         broadcaster.sendTransform(static_transformStamped)
-
         self.scene.set_pose("UAV",self.position)
-        rospy.sleep(0.003)
         pcl=self.get_pcl()
         pcl2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
         transformedPc2 = self.transform_cloud_toAgent(pcl2)
@@ -400,6 +397,7 @@ class Transition():
             position[3:]=rot.concatenate_quaternions(self.position[3:],rot.quaternion_from_axis_angle([0, 0, 1, action_vector[5]]))
 
         broadcaster = tf2_ros.StaticTransformBroadcaster()
+        rospy.sleep(0.002)
         static_transformStamped = geometry_msgs.msg.TransformStamped()
 
         static_transformStamped.header.stamp = rospy.Time.now()
@@ -419,6 +417,7 @@ class Transition():
         static_transformStamped.transform.rotation.w = position[3]
 
         broadcaster.sendTransform(static_transformStamped)
+        rospy.sleep(0.002)
         #R_t= np.matmul(pytrans.quaternion_from_axis_angle([1, 0, 0, action_vector[5]]),
         #            pytrans.quaternion_from_axis_angle[0, 1, 0, action_vector[6]])
 

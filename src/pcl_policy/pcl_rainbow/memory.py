@@ -114,7 +114,6 @@ class ReplayMemory():
 
     state_pcl = state_pcl.to(device=torch.device('cpu'))  # Only store last frame and discretise to save memory
     state_pose = state_pose.to(device=torch.device('cpu'))  # Only store last frame and discretise to save memory
-
     self.transitions.append((self.t, state_pcl, state_pose, action, reward, not terminal), self.transitions.max)  # Store new transition with maximum priority
     self.t = 0 if terminal else self.t + 1  # Start new episodes with t = 0
 
