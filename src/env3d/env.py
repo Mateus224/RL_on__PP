@@ -51,19 +51,22 @@ class Env(object):
             self.old_pcl=pcl
         else:
             reward=0
+        print("reward",reward)
 
         return state, reward, actions, i, False
 
     def simulate_step(self, action):
         pcl= np.zeros((3,0))
+        print(action)
         if (self.transition.check_transition(action)):
-            pcl = self.transition.simulate_action(action)
-            pcl=np.swapaxes(pcl,0,1)
-            print(self.old_pcl.shape[1], pcl.shape[1])
-            if self.old_pcl.shape[1] < pcl.shape[1]:
-                reward=pcl.shape[1]-self.old_pcl.shape[1]
-            else:
-                reward = 0
+            reward = self.transition.simulate_action(action)
+            print(reward)
+            #pcl=np.swapaxes(pcl,0,1)
+            #print(self.old_pcl.shape[1], pcl.shape[1])
+            #if self.old_pcl.shape[1] < pcl.shape[1]:
+            #    reward=pcl.shape[1]-self.old_pcl.shape[1]
+            #else:
+            #    reward = 0
         else:
             reward = 0
         return reward

@@ -81,6 +81,8 @@ def parse():
     parser.add_argument('-s', '--save_dir', default='./movies/', type=str, help='dir to save agent logs and checkpoints')
     parser.add_argument('-p', '--prefix', default='default', type=str, help='prefix to help make video name unique')
     parser.add_argument('--greedy', action='store_true', help="run greedy agent")
+    parser.add_argument('--eval', action='store_true', help="vlidate results and print a graph")
+
     try:
         from argument import add_arguments
         parser = add_arguments(parser)
@@ -110,9 +112,13 @@ if __name__ == '__main__':
     metrics = {'steps': [], 'rewards': [], 'entropy': []}
     
     env = Env(args, config)
+
     if not args.greedy:
         
         agent = PCL_rainbow(args, env)
     else:
         agent = Greedy(args, env, action_space=6)
-    run.init(args, env, agent, config)
+    if args.eval:
+        run.eval(args, env, agent, config)
+    else:
+        run.init(args, env, agent, config)
