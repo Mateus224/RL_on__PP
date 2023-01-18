@@ -138,7 +138,7 @@ class Transition():
 
 
     def get_pcl(self):
-        rospy.sleep(0.1)
+        #rospy.sleep(0.1)
         wait_for_pcl=True
         i=0
         if self.step==0:
@@ -219,6 +219,7 @@ class Transition():
         
         self.pub.publish(pc2)
         rospy.sleep(0.012)
+
         self.step+=1
         return self.global_pcl
         
@@ -259,7 +260,8 @@ class Transition():
         broadcaster.sendTransform(static_transformStamped)
 
         self.scene.set_pose("UAV",self.position)
-        rospy.sleep(0.003)
+
+        rospy.sleep(0.002)
         pcl=self.get_pcl()
         pcl2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
         transformedPc2 = self.transform_cloud_toAgent(pcl2)

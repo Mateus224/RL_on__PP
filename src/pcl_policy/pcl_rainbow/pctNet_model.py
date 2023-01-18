@@ -490,6 +490,10 @@ class Conv_transformer(nn.Module):
         x4 = self.oa43(x3)
         x_cat = torch.cat([x03, x1, x2, x3, x4], dim=1)
         x33 =  F.relu(self.linearLayer_weights_3(x_cat))
+<<<<<<< HEAD
+=======
+
+>>>>>>> fb06c6b6d3fcd3f53757b61444f976aaf90e5cf2
         x1 = self.oa14(x04)
         x2 = self.oa24(x1)
         x3 = self.oa34(x2)
@@ -501,6 +505,10 @@ class Conv_transformer(nn.Module):
         f_x=self.linearLayer_1(x_cat)
         f_x = self.Hoa(f_x)
         x=self.linearLayer_2(f_x)
+<<<<<<< HEAD
+=======
+
+>>>>>>> fb06c6b6d3fcd3f53757b61444f976aaf90e5cf2
         #c = nn.MaxPool1d(x.size(-1))(x)
         #c = c.view(-1, 1024)
         """

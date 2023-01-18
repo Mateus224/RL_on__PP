@@ -15,7 +15,6 @@ from plotly.graph_objs import Scatter
 from plotly.graph_objs.scatter import Line
 
 
-
 def init(args,env, agent,config):
     if True:
         if type(agent) == Greedy:
@@ -68,7 +67,9 @@ def init(args,env, agent,config):
                     done=False
                     timeout= False
                 
+
                 action = agent.epsilon_greedy(T,150000, state)
+
                 #print(action)
 
 
@@ -104,10 +105,9 @@ def init(args,env, agent,config):
                 state = next_state
 
 
-
 def eval(args, env, agent, config):
     List2_columns=1
-    List1_row=50
+    List1_row=100
     s = [[ 0 for x in range(List2_columns)] for i in range (List1_row)]
     p = [[ 0 for x in range(List2_columns)] for i in range (List1_row)]
     metrics = {'steps': s, 'points': p}
@@ -126,7 +126,8 @@ def eval(args, env, agent, config):
                 action = agent.get_action(state)
                 next_state, reward, actions, i, done = env.step(action)
                 sum_reward=sum_reward+reward
-                if step<=64:
+                if step<=100:
+
                     metrics['steps'][j].append(step)
                     metrics['points'][j].append(sum_reward)
                     step+=1
@@ -145,9 +146,11 @@ def eval(args, env, agent, config):
             print(j)
             while not done:
                 action = agent.make_action(state)
-                next_state, reward, actions, i, done = env.step(action)  # Step
+                next_state, reward, actions, i, done_ = env.step(action)  # Step
                 sum_reward=sum_reward+reward
-                if step<=65:
+                state=next_state
+
+                if step<=100:
                     metrics['steps'][j].append(step)
                     metrics['points'][j].append(sum_reward)
                     step+=1
