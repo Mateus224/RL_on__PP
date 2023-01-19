@@ -104,7 +104,7 @@ def init(args,env, agent,config):
 
 def eval(args, env, agent, config):
     List2_columns=1
-    List1_row=50
+    List1_row=100
     s = [[ 0 for x in range(List2_columns)] for i in range (List1_row)]
     p = [[ 0 for x in range(List2_columns)] for i in range (List1_row)]
     metrics = {'steps': s, 'points': p}
@@ -114,11 +114,12 @@ def eval(args, env, agent, config):
             timeout=False
             episode=0
             T, t, done = 0, 0, False
-            sum_reward=0
+            
             state, _ = env.reset()
             step = 0
             done = False
-            print(j)
+            
+            sum_reward=0
             while not done:
                 action = agent.get_action(state)
                 
@@ -129,6 +130,7 @@ def eval(args, env, agent, config):
                     metrics['points'][j].append(sum_reward)
                     step+=1
                 else:
+                    print(j, sum_reward)
                     done = True      
     if type(agent)== PCL_rainbow:
         for j in range(List1_row):
@@ -140,17 +142,18 @@ def eval(args, env, agent, config):
             state, _ = env.reset()
             step = 0
             done = False
-            print(j)
+            
             while not done:
                 action = agent.make_action(state)
                 next_state, reward, actions, i, done_ = env.step(action)  # Step
                 sum_reward=sum_reward+reward
                 state=next_state
-                if step<=65:
+                if step<=100:
                     metrics['steps'][j].append(step)
                     metrics['points'][j].append(sum_reward)
                     step+=1
                 else:
+                    print(j, sum_reward)
                     done = True
     _plot_line(metrics['steps'], metrics['points'], 'points')
 
