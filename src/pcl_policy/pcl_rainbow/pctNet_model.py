@@ -121,16 +121,16 @@ class PCT(nn.Module):
     def __init__(self, samples=[512, 256]):
         super().__init__()
 
-        #self.neighbor_embedding = NeighborEmbedding(samples)
-        self.neighbor_embedding = Embedding(3,128)
+        self.neighbor_embedding = NeighborEmbedding(samples)
+        #self.neighbor_embedding = Embedding(3,128)
         self.oa1 = OA(128)
         self.oa2 = OA(128)
         self.oa3 = OA(128)
         self.oa4 = OA(128)
 
         self.linear = nn.Sequential(
-            nn.Conv1d(640, 512, kernel_size=1, bias=False),
-            nn.BatchNorm1d(512),
+            nn.Conv1d(640, 640, kernel_size=1, bias=False),
+            nn.BatchNorm1d(640),
             nn.LeakyReLU(negative_slope=0.2)
         )
 
@@ -147,9 +147,9 @@ class PCT(nn.Module):
         #c = c.view(-1, 1024)
         #c = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
         x_max = torch.max(x, dim=-1)[0]
-        x_mean = torch.mean(x, dim=-1)
+        #x_mean = torch.mean(x, dim=-1)
 
-        return x, x_max, x_mean
+        return x, x_max#, x_mean
 
 
 class Classification(nn.Module):
@@ -608,7 +608,7 @@ class Policy2(nn.Module):
         self.action_space = actions
         self.atoms =args.atoms
 
-        self.convs1 = nn.Conv1d(2048, 1024, 1)
+        self.convs1 = nn.Conv1d(1280, 1024, 1)
         self.convs2 = nn.Conv1d(1024, 512, 1)
         self.convs3 = nn.Conv1d(512, 256, 1)
         self.convs4 = nn.Conv1d(256, 128, 1)
@@ -662,7 +662,7 @@ class Multihead_PCT_RL(nn.Module):
     def __init__(self, args, actions):
         super().__init__()
     
-        self.encoder = Conv_transformer()
+        self.encoder = PCT()
         self.policy2 = Policy2(args, actions)
 
     def forward(self, x, position, log=False):

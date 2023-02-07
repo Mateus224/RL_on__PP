@@ -103,29 +103,34 @@ class SG(nn.Module):
             coords: coordinates data with size of [B, N, 3]
         """
         x = x.permute(0, 2, 1)           # (B, N, in_channels//2)
-        new_xyz, new_feature = sample_and_knn_group(s=self.s, k=32, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
+        new_feature = sample_and_knn_group(s=self.s, k=32, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
         b, s, k, d = new_feature.size()
+        #print(new_feature.shape,'0')
         new_feature = new_feature.permute(0, 1, 3, 2)
-        new_feature = new_feature.reshape(-1, d, k)                               # [Bxs, in_channels, 32]
+        #print(new_feature.shape,'1')
+        new_feature = new_feature.reshape(-1, d, k)   
+        #print(new_feature.shape,'2')                            # [Bxs, in_channels, 32]
         batch_size = new_feature.size(0)
+        #print(batch_size)
         new_feature = F.relu(self.bn1(self.conv1(new_feature)))                   # [Bxs, in_channels, 32]
         new_feature = F.relu(self.bn2(self.conv2(new_feature)))                   # [Bxs, in_channels, 32]
         new_feature = F.adaptive_max_pool1d(new_feature, 1).view(batch_size, -1)  # [Bxs, in_channels]
+        #print(new_feature.shape,'ll')
         new_feature = new_feature.reshape(b, s, -1).permute(0, 2, 1)              # [B, in_channels, s]
-        return new_xyz, new_feature
+        return new_feature
 
 
 class NeighborEmbedding(nn.Module):
     def __init__(self, samples=[512, 256]):
         super(NeighborEmbedding, self).__init__()
 
-        self.conv1 = nn.Conv1d(3, 64, kernel_size=1, bias=False)
-        self.conv2 = nn.Conv1d(64, 64, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(64)
-        self.bn2 = nn.BatchNorm1d(64)
+        self.conv1 = nn.Conv1d(3, 128, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(128, 128, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm1d(128)
+        self.bn2 = nn.BatchNorm1d(128)
 
         self.sg1 = SG(s=samples[0], in_channels=128, out_channels=128)
-        self.sg2 = SG(s=samples[1], in_channels=256, out_channels=256)
+        #self.sg2 = SG(s=samples[1], in_channels=256, out_channels=256)
     
     def forward(self, x):
         """
@@ -137,10 +142,10 @@ class NeighborEmbedding(nn.Module):
         features = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
         features = F.relu(self.bn2(self.conv2(features))) # [B, 64, N]
 
-        xyz1, features1 = self.sg1(features, xyz)         # [B, 128, 512]
-        _, features2 = self.sg2(features1, xyz1)          # [B, 256, 256]
+        features1 = self.sg1(features, xyz)         # [B, 128, 512]
+        #_, features2 = self.sg2(features1, xyz1)          # [B, 256, 256]
 
-        return features2
+        return features1
 
 class OA(nn.Module):
     """
