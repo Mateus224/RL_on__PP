@@ -332,19 +332,16 @@ class Transition():
         self.pcd_sim.points = o3d.utility.Vector3dVector(points_1[mask_glob])
         self.ground_points_sim.points = o3d.utility.Vector3dVector(points_2[mask_ground])
         self.wall_points_sim.points = o3d.utility.Vector3dVector(points_wall[mask_wall])
-        print("ground_points_sim",np.asarray(self.ground_points_sim.points).shape)
 
 
         self.ground_points_sim = self.ground_points_sim.voxel_down_sample(voxel_size=0.9)
         self.pcd_sim = self.pcd_sim.voxel_down_sample(voxel_size=0.2)
         self.wall_points_sim = self.wall_points_sim.voxel_down_sample(voxel_size=1.4)
-        print("ground_points_sim2",np.asarray(self.ground_points_sim.points).shape)
         global_pcl=np.concatenate((np.copy(np.asarray(self.ground_points_sim.points)),np.copy(np.asarray(self.pcd_sim.points))),axis=0)
         total_reward=global_pcl.shape[0]
 
         #sub_reward=np.asarray(self.wall_points_sim.points).shape[0] # substract from reward
-        
-        print('diff', total_reward)
+
 
 
         
@@ -386,9 +383,10 @@ class Transition():
 
         #print(self.position)
         self.scene.set_pose("UAV",position)
-        rospy.sleep(0.1)
+        rospy.sleep(0.07)
         pcl=self.get_simulated_pcl()
         self.scene.set_pose("UAV",self.position)
+        rospy.sleep(0.07)
         return pcl
         
 

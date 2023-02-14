@@ -63,10 +63,8 @@ class Env(object):
 
     def simulate_step(self, action):
         pcl= np.zeros((3,0))
-        print(action)
         if (self.transition.check_transition(action)):
             reward = self.transition.simulate_action(action)
-            print(reward)
             #pcl=np.swapaxes(pcl,0,1)
             #print(self.old_pcl.shape[1], pcl.shape[1])
             #if self.old_pcl.shape[1] < pcl.shape[1]:

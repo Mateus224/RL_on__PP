@@ -124,14 +124,16 @@ def eval(args, env, agent, config):
             print(j)
             while not done:
                 action = agent.get_action(state)
-                next_state, reward, actions, i, done = env.step(action)
-                sum_reward=sum_reward+reward
+                next_state, reward, actions, i, done_ = env.step(action)
+                if not done_:
+                    sum_reward=sum_reward+reward
                 if step<=100:
 
                     metrics['steps'][j].append(step)
                     metrics['points'][j].append(sum_reward)
                     step+=1
                 else:
+                    print(sum_reward)
                     done = True      
     if type(agent)== PCL_rainbow:
         for j in range(List1_row):
@@ -167,15 +169,15 @@ def _plot_line( xs, ys_population, title, path='/home/matthias/'):
     ys_ = ys[0].squeeze()
 
     ys_min, ys_max, ys_mean, ys_std = np.amax(ys_population, axis=0), np.amin(ys_population, axis=0), ys.mean(0).squeeze(), ys.std(0).squeeze()
-    ys_upper, ys_lower = ys_mean + ys_std, ys_mean - ys_std
+    ys_upper, ys_lower = ys_mean + (1.96*(ys_std/(ys_**0.5))), ys_mean - (1.96*(ys_std/(ys_**0.5)))
 
 
     
-    trace_max = Scatter(x=xs, y=ys_max, fillcolor=std_colour,  line=Line(color=max_colour, dash='dash'), name='Max')
-    trace_upper = Scatter(x=xs, y=ys_upper.numpy(), fillcolor=std_colour, line=Line(color=transparent), name='+1 Std. Dev.', showlegend=False) #line=Line(color=transparent), name='+1 Std. Dev.', showlegend=False)
-    trace_mean = Scatter(x=xs, y=ys_mean,  fill='tonexty',  fillcolor=std_colour, line=Line(color=mean_colour), name='Mean')
-    trace_lower = Scatter(x=xs, y=ys_lower.numpy(),fill='tonexty',  fillcolor=std_colour, line=Line(color=transparent), name='-1 Std. Dev.', showlegend=False)
-    trace_min = Scatter(x=xs, y=ys_min, line=Line(color=max_colour, dash='dash'), name='Min')
+    trace_max = Scatter(x=xs[0], y=ys_max, fillcolor=std_colour,  line=Line(color=max_colour, dash='dash'), name='Max')
+    trace_upper = Scatter(x=xs[0], y=ys_upper.numpy(), fillcolor=std_colour, line=Line(color=transparent), name='+1 Std. Dev.', showlegend=False) #line=Line(color=transparent), name='+1 Std. Dev.', showlegend=False)
+    trace_mean = Scatter(x=xs[0], y=ys_mean,  fill='tonexty',  fillcolor=std_colour, line=Line(color=mean_colour), name='Mean')
+    trace_lower = Scatter(x=xs[0], y=ys_lower.numpy(),fill='tonexty',  fillcolor=std_colour, line=Line(color=transparent), name='-1 Std. Dev.', showlegend=False)
+    trace_min = Scatter(x=xs[0], y=ys_min, line=Line(color=max_colour, dash='dash'), name='Min')
 
     plotly.offline.plot({
         'data': [trace_max,trace_upper, trace_mean, trace_lower, trace_min],
