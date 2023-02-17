@@ -26,14 +26,14 @@ class PCL_rainbow():
     self.action_space = 6#env.action_space()
     self.atoms = args.atoms
     self.Vmin = 0#args.V_min
-    self.Vmax = 350#args.V_max
+    self.Vmax = 415#args.V_max
     self.support = torch.linspace(self.Vmin, self.Vmax, self.atoms).to(device=args.device)  # Support (range) of z
     self.delta_z = (self.Vmax - self.Vmin) / (self.atoms - 1)
     self.batch_size = 32 #args.batch_size
     self.n = 1#args.multi_step
     self.discount = 0.99 #args.discount
     #self.norm_clip = args.norm_clip
-    self.norm_clip = 10
+    self.norm_clip = 20
     self.device=args.device
     #self.online_net = DQN(args, self.action_space).to(device=args.device)
     #self.online_net = PointNet(args, self.action_space).to(self.device)
@@ -67,7 +67,7 @@ class PCL_rainbow():
     for param in self.target_net.parameters():
       param.requires_grad = False
 
-    self.optimiser = optim.Adam(self.online_net.parameters(), lr=args.learning_rate, eps=args.adam_eps)
+    self.optimiser = optim.Adam(self.online_net.parameters(), lr=args.learning_rate, eps=args.adam_eps,  weight_decay=1e-5)
 
   # Resets noisy weights in all linear layers (of online net only)
   def reset_noise(self):

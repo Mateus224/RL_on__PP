@@ -303,10 +303,10 @@ class Scene_settings():
             while(check):
                 self.pose_[0]= np.random.randint(1,12)
                 self.pose_[1]= np.random.randint(1,12)
-                if self.env_2D[self.pose_[0]][self.pose_[1]] != 1:
+                if self.env_2D[self.pose_[0]][self.pose_[1]] == 0:
                     check=False
                 else: 
-                    print('error works')
+                    check=True
         else:
             self.pose_[0]=pose[0]
             self.pose_[1]=pose[1]

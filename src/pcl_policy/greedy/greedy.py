@@ -19,5 +19,4 @@ class Greedy():
         reward_old=0
         for action in range(action_num):
             self.reward[action] = self.env.simulate_step(action)
-        print(self.reward, "reward array")
         return self.reward

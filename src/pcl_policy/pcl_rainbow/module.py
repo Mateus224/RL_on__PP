@@ -11,7 +11,7 @@ class Embedding(nn.Module):
     Input Embedding layer which consist of 2 stacked LBR layer.
     """
 
-    def __init__(self, in_channels=3, out_channels=128):
+    def __init__(self, in_channels=3, out_channels=256):
         super(Embedding, self).__init__()
 
         self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=False)
@@ -119,13 +119,13 @@ class NeighborEmbedding(nn.Module):
     def __init__(self, samples=[512, 256]):
         super(NeighborEmbedding, self).__init__()
 
-        self.conv1 = nn.Conv1d(3, 64, kernel_size=1, bias=False)
-        self.conv2 = nn.Conv1d(64, 64, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(64)
-        self.bn2 = nn.BatchNorm1d(64)
+        self.conv1 = nn.Conv1d(3, 128, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(128, 128, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm1d(128)
+        self.bn2 = nn.BatchNorm1d(128)
 
         self.sg1 = SG(s=samples[0], in_channels=128, out_channels=128)
-        self.sg2 = SG(s=samples[1], in_channels=256, out_channels=256)
+        #self.sg2 = SG(s=samples[1], in_channels=256, out_channels=256)
     
     def forward(self, x):
         """
@@ -133,14 +133,36 @@ class NeighborEmbedding(nn.Module):
             x: [B, 3, N]
         """
         xyz = x.permute(0, 2, 1)  # [B, N ,3]
-
         features = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
         features = F.relu(self.bn2(self.conv2(features))) # [B, 64, N]
 
-        xyz1, features1 = self.sg1(features, xyz)         # [B, 128, 512]
-        _, features2 = self.sg2(features1, xyz1)          # [B, 256, 256]
+        xyz1, features1 = self.sg1(features, xyz)  
+        #_, features2 = self.sg2(features1, xyz1)          # [B, 256, 256]
 
-        return features2
+        return features1
+
+
+class MHeadOA(nn.Module):
+    def __init__(self, features, heads=8):
+        super(MHeadOA,self).__init__()
+        self.heads=heads
+        self.layers=nn.ModuleList()
+        self.linear = nn.Sequential(
+            nn.Conv1d(heads*features, features, kernel_size=1, bias=False),
+            nn.BatchNorm1d(features),
+            nn.LeakyReLU(negative_slope=0.2)
+        )        
+        for i in range(heads):
+            self.layers.append(OA(features))
+
+
+    
+    def forward(self,x):
+        outputs = [net(x) for net in self.layers]
+        x=torch.cat(outputs, dim=1)
+        x=self.linear(x)
+        return x
+
 
 class OA(nn.Module):
     """
