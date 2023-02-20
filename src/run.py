@@ -120,7 +120,7 @@ def eval(args, env, agent, config):
             agent.eval()
             T, t, done = 0, 0, False
             sum_reward=0
-            state, _ = env.reset()
+            state = env.reset()
             step = 0
             done = False
             print(j)

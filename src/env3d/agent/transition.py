@@ -366,7 +366,9 @@ class Transition():
 
         broadcaster.sendTransform(static_transformStamped)
         self.scene.set_pose("UAV",self.position)
+        #rospy.sleep(0.08)
         pcl=self.get_pcl()
+        #rospy.sleep(0.08)
         pcl2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
         transformedPc2 = self.transform_cloud_toAgent(pcl2)
         transformedPc2.header.stamp = rospy.Time.now()
