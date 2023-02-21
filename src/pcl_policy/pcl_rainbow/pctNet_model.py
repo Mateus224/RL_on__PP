@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pcl_policy.pcl_rainbow.module import Embedding, NeighborEmbedding, OA, OAO, SA
+from pcl_policy.pcl_rainbow.module import Embedding, NeighborEmbedding, OA, MHeadOA, SA
 from torch.nn.utils import spectral_norm
 import math
 
@@ -116,6 +116,47 @@ class SPCT(nn.Module):
 
         return x, x_max, x_mean
 
+
+class PCT_M(nn.Module):
+    def __init__(self, samples=[256, 256]):
+        super().__init__()
+
+        self.neighbor_embedding = NeighborEmbedding(samples)
+        #self.neighbor_embedding = Embedding(3,128)
+        self.oa11 = MHeadOA(256)
+        #self.oa12 = MHeadOA(128)
+        #self.oa13 = OA(128)
+        #self.oa14 = OA(128)
+
+        #self.oa1 = OA(256)
+        self.oa2 = MHeadOA(256)
+        self.oa3 = MHeadOA(256)
+        self.oa4 = MHeadOA(256)
+
+        self.linear = nn.Sequential(
+            nn.Conv1d(512, 256, kernel_size=1, bias=False),
+            nn.BatchNorm1d(256),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+        self.linear1 = nn.Sequential(
+            nn.Conv1d(1280, 1280, kernel_size=1, bias=False),
+            nn.BatchNorm1d(1280),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+    def forward(self, x):
+        
+        x1,x2,x3,x4 = self.neighbor_embedding(x)
+        x_cat= torch.cat([ x1, x2,  x3, x4], dim=1)
+        x10 = self.oa11(x_cat)
+        x11 = self.oa2(x10)
+        x12 = self.oa3(x11)
+        x13 = self.oa4(x12)
+        x = torch.cat([x_cat, x10, x11, x12, x13], dim=1)
+        x = self.linear1(x)
+        x_max = torch.max(x, dim=-1)[0]
+        #x_mean = torch.mean(x, dim=-1)
+
+        return x, x_max#, x_mean
 
 class PCT(nn.Module):
     def __init__(self, samples=[512, 256]):
@@ -388,8 +429,8 @@ class PCTSeg(nn.Module):
 class PCT_RL(nn.Module):
     def __init__(self, args, actions):
         super().__init__()
-    
-        self.encoder = PCT()
+        print('sss')
+        self.encoder = PCT_M()
         self.pol = Policy(args, actions)
 
     def forward(self, x, position, log=False):
@@ -608,10 +649,10 @@ class Policy2(nn.Module):
         self.action_space = actions
         self.atoms =args.atoms
 
-        self.convs1 = nn.Conv1d(1280, 1024, 1)
-        self.convs2 = nn.Conv1d(1024, 512, 1)
-        self.convs3 = nn.Conv1d(512, 256, 1)
-        self.convs4 = nn.Conv1d(256, 128, 1)
+        self.convs1 = nn.Conv1d(2560, 512, 1)
+        self.convs2 = nn.Conv1d(512, 256, 1)
+        self.convs3 = nn.Conv1d(256, 128, 1)
+        #self.convs4 = nn.Conv1d(256, 128, 1)
 
         self.bns1 = nn.BatchNorm1d(128)
         self.bns2 = nn.BatchNorm1d(64)
@@ -635,7 +676,7 @@ class Policy2(nn.Module):
         x = F.relu(self.convs1(x))
         x = F.relu(self.convs2(x))
         x = F.relu(self.convs3(x))
-        x = F.relu(self.convs4(x))
+        #x = F.relu(self.convs4(x))
         xb = torch.flatten(x, start_dim=1)
         #xb = F.relu(self.fc1(xb))
         #xb = torch.cat([xb,p], dim=1)
@@ -662,7 +703,7 @@ class Multihead_PCT_RL(nn.Module):
     def __init__(self, args, actions):
         super().__init__()
     
-        self.encoder = PCT()
+        self.encoder = PCT_M()
         self.policy2 = Policy2(args, actions)
 
     def forward(self, x, position, log=False):

@@ -160,25 +160,32 @@ def sample_and_knn_group(s, k, coords, features):
         new_coords[tensor]: sampled and grouped points coordinates by FPS with size of [B, s, k, 3]
         new_features[tensor]: sampled and grouped points features by FPS with size of [B, s, k, 2D]
     """
+
     batch_size = coords.shape[0]
     coords = coords.contiguous()
-
+    feature_k1 = features.narrow(2,0,64)
+    feature_k2 = features.narrow(2,64,64)
     # FPS sampling
     #fps_idx = pointnet2_utils.furthest_point_sample(coords, s).long()  # [B, s]
     #new_coords = index_points(coords, fps_idx)                         # [B, s, 3]
     #new_features = index_points(features, fps_idx)                     # [B, s, D]
 
     # K-nn grouping
-    idx = knn_point(k, coords, coords)                                              # [B, s, k]
-    grouped_features = index_points(features, idx)                                      # [B, s, k, D]
-    
+    idx = knn_point(k, coords, coords)                                       # [B, s, k]
+    #grouped_features = index_points(features, idx)       
+    #grouped_features1 = features1
+    grouped_features1 = index_points(feature_k1, idx)
+    grouped_features2 = index_points(feature_k2, idx)
+    #print(grouped_features1.shape,grouped_features2.shape,'grouped_features2')
+    #grouped_features3 = index_points(features3, idx)
+    #grouped_features4 = index_points(features4, idx)                             # [B, s, k, D]
+    #grouped_features = torch.cat([grouped_features1, grouped_features2, grouped_features3, grouped_features4], dim=3)  
     # Matrix sub
-    #grouped_features_norm = grouped_features #- new_features.view(batch_size, s, 1, -1)  # [B, s, k, D]
+    #grouped_features_norm = grouped_features - new_features.view(batch_size, s, 1, -1)  # [B, s, k, D]
 
     # Concat
     #aggregated_features = torch.cat([grouped_features_norm, new_features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1)  # [B, s, k, 2D]
-
-    return  grouped_features# new_coords, aggregated_features  # [B, s, 3], [B, s, k, 2D]
+    return  grouped_features1, grouped_features2#, grouped_features3, grouped_features4  # [B, s, 3], [B, s, k, 2D]
 
 
 class Logger():
