@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-#from pointnet2_ops import pointnet2_utils
+from pointnet2_ops import pointnet2_utils
 
 
 def cal_loss(pred, ground_truth, smoothing=True):
@@ -163,8 +163,8 @@ def sample_and_knn_group(s, k, coords, features):
 
     batch_size = coords.shape[0]
     coords = coords.contiguous()
-    feature_k1 = features.narrow(2,0,64)
-    feature_k2 = features.narrow(2,64,64)
+    #feature_k1 = features.narrow(2,0,64)
+    #feature_k2 = features.narrow(2,64,64)
     # FPS sampling
     #fps_idx = pointnet2_utils.furthest_point_sample(coords, s).long()  # [B, s]
     #new_coords = index_points(coords, fps_idx)                         # [B, s, 3]
@@ -174,19 +174,52 @@ def sample_and_knn_group(s, k, coords, features):
     idx = knn_point(k, coords, coords)                                       # [B, s, k]
     #grouped_features = index_points(features, idx)       
     #grouped_features1 = features1
-    grouped_features1 = index_points(feature_k1, idx)
-    grouped_features2 = index_points(feature_k2, idx)
+    grouped_features = index_points(features, idx)
+    #grouped_features2 = index_points(feature_k2, idx)
     #print(grouped_features1.shape,grouped_features2.shape,'grouped_features2')
     #grouped_features3 = index_points(features3, idx)
     #grouped_features4 = index_points(features4, idx)                             # [B, s, k, D]
     #grouped_features = torch.cat([grouped_features1, grouped_features2, grouped_features3, grouped_features4], dim=3)  
     # Matrix sub
-    #grouped_features_norm = grouped_features - new_features.view(batch_size, s, 1, -1)  # [B, s, k, D]
-
+    grouped_features_norm = grouped_features - features.view(batch_size, s, 1, -1)  # [B, s, k, D]
+    aggregated_features = torch.cat([grouped_features_norm, features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1) 
     # Concat
     #aggregated_features = torch.cat([grouped_features_norm, new_features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1)  # [B, s, k, 2D]
-    return  grouped_features1, grouped_features2#, grouped_features3, grouped_features4  # [B, s, 3], [B, s, k, 2D]
+    return  aggregated_features#1, grouped_features2#, grouped_features3, grouped_features4  # [B, s, 3], [B, s, k, 2D]
 
+
+def sample_and_knn_group1(s, k, coords, features):
+    """
+    Sampling by FPS and grouping by KNN.
+    Input:
+        s[int]: number of points to be sampled by FPS
+        k[int]: number of points to be grouped into a neighbor by KNN
+        coords[tensor]: input points coordinates data with size of [B, N, 3]
+        features[tensor]: input points features data with size of [B, N, D]
+    
+    Returns:
+        new_coords[tensor]: sampled and grouped points coordinates by FPS with size of [B, s, k, 3]
+        new_features[tensor]: sampled and grouped points features by FPS with size of [B, s, k, 2D]
+    """
+    batch_size = coords.shape[0]
+    coords = coords.contiguous()
+
+    # FPS sampling
+    fps_idx = pointnet2_utils.furthest_point_sample(coords, s).long()  # [B, s]
+    new_coords = index_points(coords, fps_idx)                         # [B, s, 3]
+    new_features = index_points(features, fps_idx)                     # [B, s, D]
+
+    # K-nn grouping
+    idx = knn_point(k, coords, new_coords)                                              # [B, s, k]
+    grouped_features = index_points(features, idx)                                      # [B, s, k, D]
+    
+    # Matrix sub
+    grouped_features_norm = grouped_features - new_features.view(batch_size, s, 1, -1)  # [B, s, k, D]
+
+    # Concat
+    aggregated_features = torch.cat([grouped_features_norm, new_features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1)  # [B, s, k, 2D]
+
+    return new_coords, aggregated_features  # [B, s, 3], [B, s, k, 2D]
 
 class Logger():
     def __init__(self, path):
