@@ -15,7 +15,7 @@ class Env(object):
         self.scene=Scene_settings(config)
         self.transition=Transition(config,self.scene)
         self.config=config
-        self.pcl_size=768
+        self.pcl_size=600
 
         
 
@@ -45,7 +45,7 @@ class Env(object):
         pcl, pose = self.transition.make_action(actions[i])
         pcl=np.swapaxes(pcl,0,1)
         self.points=pcl.shape[1]
-        if pcl.shape[1]>767:
+        if pcl.shape[1]>599:
             terminate=True
             print("too many points !!!", pcl.shape)
         else:

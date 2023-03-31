@@ -1,6 +1,9 @@
 import torch
 import torch.nn.functional as F
 #from pointnet2_ops import pointnet2_utils
+#from pytorch3d.ops import sample_farthest_points
+
+
 
 
 def cal_loss(pred, ground_truth, smoothing=True):
@@ -90,6 +93,7 @@ def knn_point(k, xyz, new_xyz):
     return group_idx
 
 
+
 def index_points(points, idx):
     """
     Input:
@@ -99,6 +103,7 @@ def index_points(points, idx):
     Output:
         new_points:, indexed points data, [B, S, C]
     """
+    
     device = points.device
     B = points.shape[0]
     view_shape = list(idx.shape)
@@ -135,6 +140,7 @@ def sample_and_ball_group(s, radius, n, coords, features):
 
     # ball_query grouping
     idx = query_ball_point(radius, n, coords, new_coords)              # [B, s, n]
+    
     grouped_features = index_points(features, idx)                     # [B, s, n, D]
     
     # Matrix sub
@@ -160,25 +166,139 @@ def sample_and_knn_group(s, k, coords, features):
         new_coords[tensor]: sampled and grouped points coordinates by FPS with size of [B, s, k, 3]
         new_features[tensor]: sampled and grouped points features by FPS with size of [B, s, k, 2D]
     """
+
     batch_size = coords.shape[0]
     coords = coords.contiguous()
-
+    #feature_k1 = features.narrow(2,0,64)
+    #feature_k2 = features.narrow(2,64,64)
     # FPS sampling
     #fps_idx = pointnet2_utils.furthest_point_sample(coords, s).long()  # [B, s]
     #new_coords = index_points(coords, fps_idx)                         # [B, s, 3]
     #new_features = index_points(features, fps_idx)                     # [B, s, D]
 
     # K-nn grouping
-    idx = knn_point(k, coords, coords)                                              # [B, s, k]
+    idx = knn_point(k, coords, coords)                                       # [B, s, k]
+    #grouped_features = index_points(features, idx)       
+    #grouped_features1 = features1
+    grouped_features = index_points(features, idx)
+    #grouped_features2 = index_points(feature_k2, idx)
+    #print(grouped_features1.shape,grouped_features2.shape,'grouped_features2')
+    #grouped_features3 = index_points(features3, idx)
+    #grouped_features4 = index_points(features4, idx)                             # [B, s, k, D]
+    #grouped_features = torch.cat([grouped_features1, grouped_features2, grouped_features3, grouped_features4], dim=3)  
+    # Matrix sub
+    grouped_features_norm = grouped_features - features.view(batch_size, s, 1, -1)  # [B, s, k, D]
+    aggregated_features = torch.cat([grouped_features_norm, features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1) 
+    # Concat
+    #aggregated_features = torch.cat([grouped_features_norm, new_features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1)  # [B, s, k, 2D]
+    return  coords, aggregated_features#1, grouped_features2#, grouped_features3, grouped_features4  # [B, s, 3], [B, s, k, 2D]
+
+def sample_and_knn_group1(s, k, coords, features, t):
+    """
+    Sampling by FPS and grouping by KNN.
+    Input:
+        s[int]: number of points to be sampled by FPS
+        k[int]: number of points to be grouped into a neighbor by KNN
+        coords[tensor]: input points coordinates data with size of [B, N, 3]
+        features[tensor]: input points features data with size of [B, N, D]
+    
+    Returns:
+        new_coords[tensor]: sampled and grouped points coordinates by FPS with size of [B, s, k, 3]
+        new_features[tensor]: sampled and grouped points features by FPS with size of [B, s, k, 2D]
+    """
+    batch_size = coords.shape[0]
+    coords = coords.contiguous()
+    # FPS sampling
+    batch_FPSPoints= np.empty([batch_size,s,3])
+    batch_index=np.empty([batch_size,s])
+    #print(s, coords.shape)
+    for i in range(batch_size):
+        fps = FPS(coords[i,:,:].cpu(), s)
+        fps.fit()
+        batch_FPSPoints[i,:,:]=torch.from_numpy(fps.get_selected_pts())
+        #print(batch_FPSPoints[i,:,:].shape, coords[i,:,:].cpu().numpy().shape)
+        for w in range(s):
+            batch_index[i,w]=np.where(np.all(batch_FPSPoints[i,w,:]==coords[i,:,:].cpu().numpy(), axis=1))[0][0]
+                    #print(s_)
+    #fps_idx = pointnet2_utils.furthest_point_sample(coords, s).long()  # [B, s]
+    #batch_index=batch_index#.long()#torch.from_numpy(batch_index).long()
+    new_coords = index_points(coords, batch_index)                      # [B, s, 3]
+    #print(new_coords.shape)
+    new_features = index_points(features, batch_index)                     # [B, s, D]
+    # K-nn grouping
+    #new_coords=batch_FPSPoints#.to(device='cuda')
+    idx = knn_point(k, coords, new_coords)                                           # [B, s, k]
     grouped_features = index_points(features, idx)                                      # [B, s, k, D]
     
     # Matrix sub
-    #grouped_features_norm = grouped_features - new_features.view(batch_size, s, 1, -1)  # [B, s, k, D]
+    grouped_features_norm = grouped_features - new_features.view(batch_size, s, 1, -1)  # [B, s, k, D]
 
     # Concat
-    #aggregated_features = torch.cat([grouped_features_norm, new_features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1)  # [B, s, k, 2D]
-    return coords, grouped_features  # [B, s, 3], [B, s, k, 2D]
+    if t==False:
+        aggregated_features = torch.cat([grouped_features_norm, new_features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1)  # [B, s, k, 2D]
 
+        return new_coords, aggregated_features 
+    else:
+        return new_coords, grouped_features_norm 
+
+import numpy as np
+
+class FPS:
+    def __init__(self, pcd_xyz, n_samples):
+        self.n_samples = n_samples
+        self.pcd_xyz = pcd_xyz
+        self.n_pts = pcd_xyz.shape[0]
+        self.dim = pcd_xyz.shape[1]
+        self.selected_pts = None
+        self.selected_pts_expanded = np.zeros(shape=(n_samples, 1, self.dim))
+        self.remaining_pts = np.copy(pcd_xyz)
+
+        self.grouping_radius = None
+        self.dist_pts_to_selected = None  # Iteratively updated in step(). Finally re-used in group()
+        self.labels = None
+
+        # Random pick a start
+        self.start_idx = np.random.randint(low=0, high=self.n_pts - 1)
+        self.selected_pts_expanded[0] = self.remaining_pts[self.start_idx]
+        self.n_selected_pts = 1
+
+    def get_selected_pts(self):
+        self.selected_pts = np.squeeze(self.selected_pts_expanded, axis=1)
+        return self.selected_pts
+
+    def step(self):
+        if self.n_selected_pts < self.n_samples:
+            self.dist_pts_to_selected = self.__distance__(self.remaining_pts, self.selected_pts_expanded[:self.n_selected_pts]).T
+            dist_pts_to_selected_min = np.min(self.dist_pts_to_selected, axis=1, keepdims=True)
+            res_selected_idx = np.argmax(dist_pts_to_selected_min)
+            self.selected_pts_expanded[self.n_selected_pts] = self.remaining_pts[res_selected_idx]
+
+            self.n_selected_pts += 1
+        else:
+            print("Got enough number samples")
+
+
+    def fit(self):
+        for _ in range(1, self.n_samples):
+            self.step()
+        return self.get_selected_pts()
+
+    def group(self, radius):
+        self.grouping_radius = radius   # the grouping radius is not actually used
+        dists = self.dist_pts_to_selected
+
+        # Ignore the "points"-"selected" relations if it's larger than the radius
+        dists = np.where(dists > radius, dists+1000000*radius, dists)
+
+        # Find the relation with the smallest distance.
+        # NOTE: the smallest distance may still larger than the radius.
+        self.labels = np.argmin(dists, axis=1)
+        return self.labels
+
+
+    @staticmethod
+    def __distance__(a, b):
+        return np.linalg.norm(a - b, ord=2, axis=2)
 
 class Logger():
     def __init__(self, path):

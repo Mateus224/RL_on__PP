@@ -70,7 +70,7 @@ def init(args,env, agent,config):
                     mem.append(state, actions[j], 0, True)
             #print(state[0].shape)
             mem.append(state, actions[i], reward, done) 
-            if T >= 15000:#args.learn_start:
+            if T >= 20000:#args.learn_start:
                 mem.priority_weight = min(mem.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
 
                 agent.learn(mem)  # Train with n-step distributional double-Q learning
@@ -120,7 +120,7 @@ def eval(args, env, agent, config):
             agent.eval()
             T, t, done = 0, 0, False
             sum_reward=0
-            state, _ = env.reset()
+            state = env.reset()
             step = 0
             done = False
             print(j)

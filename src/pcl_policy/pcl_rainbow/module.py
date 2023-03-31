@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pcl_policy.pcl_rainbow.util import sample_and_knn_group
+from pcl_policy.pcl_rainbow.util import sample_and_knn_group, sample_and_knn_group1
 
 
 class Embedding(nn.Module):
@@ -86,10 +86,11 @@ class SG(nn.Module):
     SG(sampling and grouping) module.
     """
 
-    def __init__(self, s, in_channels, out_channels):
+    def __init__(self, s, in_channels, out_channels, k=32, t=False):
         super(SG, self).__init__()
 
         self.s = s
+        self.t=t
 
         self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=False)
         self.conv2 = nn.Conv1d(out_channels, out_channels, kernel_size=1, bias=False)
@@ -103,7 +104,7 @@ class SG(nn.Module):
             coords: coordinates data with size of [B, N, 3]
         """
         x = x.permute(0, 2, 1)           # (B, N, in_channels//2)
-        new_xyz, new_feature = sample_and_knn_group(s=self.s, k=32, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
+        new_xyz, new_feature = sample_and_knn_group(s=self.s, k=64, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
         b, s, k, d = new_feature.size()
         new_feature = new_feature.permute(0, 1, 3, 2)
         new_feature = new_feature.reshape(-1, d, k)                               # [Bxs, in_channels, 32]
@@ -114,18 +115,68 @@ class SG(nn.Module):
         new_feature = new_feature.reshape(b, s, -1).permute(0, 2, 1)              # [B, in_channels, s]
         return new_xyz, new_feature
 
+class SG_4(nn.Module):
+    """
+    SG(sampling and grouping) module.
+    """
+
+    def __init__(self, s, in_channels, out_channels):
+        super(SG_4, self).__init__()
+
+        self.s = s
+
+        self.conv1 = nn.Conv1d(128, 128, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(128, 128, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm1d(128)
+        self.bn2 = nn.BatchNorm1d(128)
+
+        self.convE1 = nn.Conv1d(128, 128, kernel_size=1, bias=False)
+        self.convE2 = nn.Conv1d(128, 128, kernel_size=1, bias=False)
+        self.bnE1 = nn.BatchNorm1d(128)
+        self.bnE2 = nn.BatchNorm1d(128)
+    
+    def forward(self, x, coords):
+        """
+        Input:
+            x: features with size of [B, in_channels//2, N]
+            coords: coordinates data with size of [B, N, 3]
+        """
+        feature_k = x.narrow(1,0,128)
+        feature_s = x.narrow(1,128,128)
+        feature_k = feature_k.permute(0, 2, 1)           # (B, N, in_channels//2)
+        new_xyz, new_feature1 = sample_and_knn_group(s=self.s, k=64, coords=coords, features=feature_k)  # [B, s, 3], [B, s, 32, in_channels]
+        #new_feature1 = F.relu(self.bnE1(self.convE1(new_feature1)))                   # [Bxs, in_channels, 32]
+        #features1 = F.relu(self.bnE2(self.convE2(new_feature1)))  
+        
+        feature_k=self.grouped_features(new_feature1)
+        #features2=self.grouped_features(new_feature2)
+        #features3=self.grouped_features(new_feature3)
+        #features4=self.grouped_features(new_feature4)
+        return feature_k, feature_s
+        
+    def grouped_features(self, new_feature):
+        b, s, k, d = new_feature.size()
+        new_feature = new_feature.permute(0, 1, 3, 2)
+        new_feature = new_feature.reshape(-1, d, k)                               # [Bxs, in_channels, 32]
+        batch_size = new_feature.size(0)
+        new_feature = F.relu(self.bn1(self.conv1(new_feature)))                   # [Bxs, in_channels, 32]
+        new_feature = F.relu(self.bn2(self.conv2(new_feature)))                   # [Bxs, in_channels, 32]
+        new_feature = F.adaptive_max_pool1d(new_feature, 1).view(batch_size, -1)  # [Bxs, in_channels]
+        new_feature = new_feature.reshape(b, s, -1).permute(0, 2, 1)              # [B, in_channels, s]
+        return new_feature
+
 
 class NeighborEmbedding(nn.Module):
-    def __init__(self, samples=[512, 256]):
+    def __init__(self, samples=[512, 512]):
         super(NeighborEmbedding, self).__init__()
 
         self.conv1 = nn.Conv1d(3, 128, kernel_size=1, bias=False)
         self.conv2 = nn.Conv1d(128, 128, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm1d(128)
         self.bn2 = nn.BatchNorm1d(128)
-
-        self.sg1 = SG(s=samples[0], in_channels=128, out_channels=128)
-        #self.sg2 = SG(s=samples[1], in_channels=256, out_channels=256)
+        self.sg1 = SG(s=600, in_channels=256, out_channels=256, k=64)
+        #self.sg2 = SG(s=512, in_channels=256, out_channels=256, k=32)
+        #self.sg3 = SG(s=512, in_channels=256, out_channels=256, k=64, t=True)
     
     def forward(self, x):
         """
@@ -136,14 +187,14 @@ class NeighborEmbedding(nn.Module):
         features = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
         features = F.relu(self.bn2(self.conv2(features))) # [B, 64, N]
 
-        xyz1, features1 = self.sg1(features, xyz)  
-        #_, features2 = self.sg2(features1, xyz1)          # [B, 256, 256]
-
-        return features1
+        _, features2 = self.sg1(features, xyz)  
+        #_, features = self.sg2(features, xyz)          # [B, 256, 256]
+        #_, features2 = self.sg1(features, xyz)
+        return features2
 
 
 class MHeadOA(nn.Module):
-    def __init__(self, features, heads=8):
+    def __init__(self, features, heads=4):
         super(MHeadOA,self).__init__()
         self.heads=heads
         self.layers=nn.ModuleList()
