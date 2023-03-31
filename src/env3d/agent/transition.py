@@ -86,6 +86,7 @@ class Transition():
 
         self.pcd_sim = o3d.geometry.PointCloud()
         self.ground_points_sim = o3d.geometry.PointCloud()
+        self.wall_points_sim = o3d.geometry.PointCloud()
 
 
         self.pub = rospy.Publisher("/pcl_topic", PointCloud2)
@@ -263,8 +264,6 @@ class Transition():
 
 
     def get_simulated_pcl(self):
-        #self.pcd_sim=self.pcd
-        #self.ground_points_sim=self.ground_points
         wait_for_pcl=True
         i=0
         if self.step==0:
@@ -278,39 +277,61 @@ class Transition():
                 i=i+1
                 if i>10:
                     wait_for_pcl=False
-                    #print('i bigger 8')
+                    print('-----------')
             else:
                 wait_for_pcl=False
-        #self.old_cloud=np.copy(pc_np_)
-        global_pcl=np.concatenate((self.global_pcl, np.copy(pc_np)), axis=0)
-        global_pcl=np.where(global_pcl<0.01,0.01,  global_pcl)
-        pc_pcl = pcl.PointCloud(np.array(global_pcl, dtype = np.float32))
+        global_pcl_sim=np.concatenate((self.global_pcl, np.copy(pc_np)), axis=0)
+        global_pcl_sim=np.where(global_pcl_sim<0.01,0.01,  global_pcl_sim)
+        pc_pcl = pcl.PointCloud(np.array(global_pcl_sim, dtype = np.float32))
 
         self.pcd_sim.points = o3d.utility.Vector3dVector(pc_pcl)
         points_1 = np.copy(np.asarray(self.pcd_sim.points))
         points_2 = np.copy(np.asarray(self.pcd_sim.points))
+        points_wall = np.copy(np.asarray(self.pcd_sim.points))
         mask_glob = points_1[:,2] > 0.02
+        mask_globx0 = points_1[:,0] > 0.1
+        mask_globx1 = points_1[:,0] < 11.9
+        mask_globy0 = points_1[:,1] > 0.1
+        mask_globy1 = points_1[:,1] < 11.9        
+
+
         mask_ground = points_2[:,2] < 0.02 
-        mask_groundx0 = points_2[:,0] > 0.0
-        mask_groundx1 = points_2[:,0] < 10.0
-        mask_groundy0 = points_2[:,1] > 0.0
-        mask_groundy1 = points_2[:,1] < 10.0
-        mask_ground=np.all([mask_ground,mask_groundx0], axis=0)
-        mask_ground=np.all([mask_ground,mask_groundx1], axis=0)
-        mask_ground=np.all([mask_ground,mask_groundy0], axis=0)
-        mask_ground=np.all([mask_ground,mask_groundy1], axis=0)
+        #mask_groundx0 = points_2[:,0] > -0.01
+        #mask_groundx1 = points_2[:,0] < 12.01
+        #mask_groundy0 = points_2[:,1] > -0.01
+        #mask_groundy1 = points_2[:,1] < 12.01
+
+        mask_wallx0 = points_wall[:,0] <= 0.1
+        mask_wallx1 = points_wall[:,0] >= 11.9
+        mask_wally0 = points_wall[:,1] <= 0.1
+        mask_wally1 = points_wall[:,1] >= 11.9
+        
+
+        mask_glob=np.all([mask_glob,mask_globx0], axis=0)
+        mask_glob=np.all([mask_glob,mask_globx1], axis=0)
+        mask_glob=np.all([mask_glob,mask_globy0], axis=0)
+        mask_glob=np.all([mask_glob,mask_globy1], axis=0)
+        
+
+        mask_wall=np.any([mask_wallx0,mask_wallx1], axis=0)
+        mask_wall=np.any([mask_wall,mask_wally0], axis=0)
+        mask_wall=np.any([mask_wall,mask_wally1], axis=0)
+
+
         self.pcd_sim.points = o3d.utility.Vector3dVector(points_1[mask_glob])
         self.ground_points_sim.points = o3d.utility.Vector3dVector(points_2[mask_ground])
+        self.wall_points_sim.points = o3d.utility.Vector3dVector(points_wall[mask_wall])
+
+
         self.ground_points_sim = self.ground_points_sim.voxel_down_sample(voxel_size=0.9)
         self.pcd_sim = self.pcd_sim.voxel_down_sample(voxel_size=0.2)
+        self.wall_points_sim = self.wall_points_sim.voxel_down_sample(voxel_size=1.4)
         global_pcl=np.concatenate((np.copy(np.asarray(self.ground_points_sim.points)),np.copy(np.asarray(self.pcd_sim.points))),axis=0)
-        #self.pcd_sim.points = o3d.utility.Vector3dVector(self.global_pcl)
-        #self.header.stamp = rospy.Time.now()
-        #pc2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd_sim.points)
-        #self.pub.publish(pc2)
-        return global_pcl #, self.global_pcl
+        total_reward=global_pcl.shape[0]
 
-
+        #sub_reward=np.asarray(self.wall_points_sim.points).shape[0] # substract from reward
+        return total_reward
+    """
     def simulate_action(self, action):
         
         action_vector=self.action_set[action]
@@ -350,5 +371,50 @@ class Transition():
         pcl=self.get_simulated_pcl()
         self.scene.set_pose("UAV",self.position)
         return pcl
+    """
+
+    def simulate_action(self, action):
+    
+        action_vector=self.action_set[action]
+        position=np.copy(self.position)
+        if action<4:
+            position[:2]=self.position[:2]+action_vector[:2]
+        else:
+            position[3:]=rot.concatenate_quaternions(self.position[3:],rot.quaternion_from_axis_angle([0, 0, 1, action_vector[4]]))
+            position[3:]=rot.concatenate_quaternions(self.position[3:],rot.quaternion_from_axis_angle([0, 0, 1, action_vector[5]]))
+
+        broadcaster = tf2_ros.StaticTransformBroadcaster()
+        rospy.sleep(0.002)
+        static_transformStamped = geometry_msgs.msg.TransformStamped()
+
+        static_transformStamped.header.stamp = rospy.Time.now()
+        static_transformStamped.header.frame_id = "world"
+        static_transformStamped.child_frame_id = "UAV"
+
+
+        static_transformStamped.transform.translation.x = float(position[0])
+        static_transformStamped.transform.translation.y = float(position[1])
+        static_transformStamped.transform.translation.z = float(position[2])
+
+        quat = tf.transformations.quaternion_from_euler(
+                float(0),float(0),float(0))
+        static_transformStamped.transform.rotation.x = position[4]
+        static_transformStamped.transform.rotation.y = position[5]
+        static_transformStamped.transform.rotation.z = position[6]
+        static_transformStamped.transform.rotation.w = position[3]
+
+        broadcaster.sendTransform(static_transformStamped)
+        rospy.sleep(0.002)
+        #R_t= np.matmul(pytrans.quaternion_from_axis_angle([1, 0, 0, action_vector[5]]),
+        #            pytrans.quaternion_from_axis_angle[0, 1, 0, action_vector[6]])
+
+        #print(self.position)
+        self.scene.set_pose("UAV",position)
+        rospy.sleep(0.06)
+        reward=self.get_simulated_pcl()
+        self.scene.set_pose("UAV",self.position)
+        rospy.sleep(0.06)
+        return reward
+            
         
 

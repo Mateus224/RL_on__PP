@@ -40,8 +40,8 @@ def parse():
     parser.add_argument('--learn-start', type=int, default=int(20e3), metavar='STEPS', help='Number of steps before starting training')
     parser.add_argument('--evaluation-interval', type=int, default=12000, metavar='STEPS', help='Number of training steps between evaluations')
     parser.add_argument('--target-update', type=int, default=int(8e3), metavar='τ', help='Number of steps after which to update target network')
-    parser.add_argument('--id', type=str, default='new_base', help='Experiment_oas_emb')
-    parser.add_argument('--model_path', type=str, default = "results/ownAttention/345_4x2x1.pth", help='model used during testing / visulization') #testmoreFilters.h5
+    parser.add_argument('--id', type=str, default='new_base_multihead', help='Experiment_oas_emb')
+    parser.add_argument('--model_path', type=str, default = "results/new_base/checkpoint.pth", help='model used during testing / visulization') #testmoreFilters.h5
     parser.add_argument('--exp_name', type=str, default = "", help='')
     parser.add_argument('--frame_width', type=int, default = 84, help='Resized frame width')
     parser.add_argument('--frame_height', type=int, default = 84, help='Resized frame height')
@@ -113,12 +113,14 @@ if __name__ == '__main__':
     
     env = Env(args, config)
     
-    if not args.greedy:
+    #if not args.greedy:
         
-        agent = PCL_rainbow(args, env)
-    else:
-        agent = Greedy(args, env, action_space=6)
+    #    agent = PCL_rainbow(args, env)
+    #else:
+    #    agent = Greedy(args, env, action_space=6)
     if args.eval:
-        run.eval(args, env, agent, config)
+        agent1 = Greedy(args, env, action_space=6)
+        agent2 = PCL_rainbow(args, env)
+        run.eval(args, env, agent1, agent2, config)
     else:
         run.init(args, env, agent, config)

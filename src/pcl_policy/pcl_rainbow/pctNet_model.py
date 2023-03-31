@@ -164,10 +164,10 @@ class PCT_E(nn.Module):
 
         self.neighbor_embedding = NeighborEmbedding(samples)
         #self.neighbor_embedding = NeighborEmbedding_origing(samples)
-        self.oa1 = OA(256)#MHeadOA(256)
-        self.oa2 = OA(256)#MHeadOA(256)
-        self.oa3 = OA(256)#MHeadOA(256)
-        self.oa4 = OA(256)#MHeadOA(256)
+        self.oa1 = OA(256) #MHeadOA(256)
+        self.oa2 = OA(256) #MHeadOA(256)
+        self.oa3 = OA(256) #MHeadOA(256)
+        self.oa4 = OA(256) #MHeadOA(256)
 
         self.linear = nn.Sequential(
             nn.Conv1d(1280, 1280, kernel_size=1, bias=False),

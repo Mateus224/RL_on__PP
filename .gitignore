@@ -260,4 +260,5 @@ dmypy.json
 
 #Other
 src/runs/
+src/paper_runs/
 src/results/

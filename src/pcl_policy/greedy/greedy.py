@@ -2,6 +2,7 @@ import numpy as np
 
 
 
+
 class Greedy():
     def __init__(self, args, env, action_space):
         self.pcl_old=np.zeros((3,512))
@@ -19,5 +20,4 @@ class Greedy():
         reward_old=0
         for action in range(action_num):
             self.reward[action] = self.env.simulate_step(action)
-        print(self.reward, "reward array")
         return self.reward
