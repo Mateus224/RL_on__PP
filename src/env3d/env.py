@@ -30,7 +30,6 @@ class Env(object):
         self.old_pcl=np.zeros((1,3))
         state=[self.pcl, self.scene.quat_pose]
         self.points=0
-
         return state 
 
 
