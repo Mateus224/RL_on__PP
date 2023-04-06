@@ -40,8 +40,8 @@ def parse():
     parser.add_argument('--learn-start', type=int, default=int(20e3), metavar='STEPS', help='Number of steps before starting training')
     parser.add_argument('--evaluation-interval', type=int, default=12000, metavar='STEPS', help='Number of training steps between evaluations')
     parser.add_argument('--target-update', type=int, default=int(8e3), metavar='τ', help='Number of steps after which to update target network')
-    parser.add_argument('--id', type=str, default='withoutFPS', help='Experiment ID')
-    parser.add_argument('--model_path', type=str, default = "results/withoutFPS/checkpoint.pth", help='model used during testing / visulization') #testmoreFilters.h5
+    parser.add_argument('--id', type=str, default='compex_env_best', help='Experiment ID')
+    parser.add_argument('--model_path', type=str, default = "results/compex_env_best/checkpoint.pth", help='model used during testing / visulization') #testmoreFilters.h5
 
     parser.add_argument('--exp_name', type=str, default = "", help='')
     parser.add_argument('--frame_width', type=int, default = 84, help='Resized frame width')
