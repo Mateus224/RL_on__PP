@@ -162,7 +162,7 @@ class PCT_E(nn.Module):
     def __init__(self, samples=[300,150,512]):
         super().__init__()
 
-        self.neighbor_embedding = NeighborEmbedding(samples)
+        self.neighbor_embedding = NeighborEmbedding_own(samples)
         #self.neighbor_embedding = NeighborEmbedding_origing(samples)
         self.oa1 = OA(256) #MHeadOA(256)
         self.oa2 = OA(256) #MHeadOA(256)
@@ -693,15 +693,15 @@ class Policy2(nn.Module):
         self.convs3 = nn.Conv1d(256, 64, 1)
         #self.convs4 = nn.Conv1d(256, 128, 1)
 
-        self.bns1 = nn.BatchNorm1d(1024)
+        self.bns1 = nn.BatchNorm1d(256)
         self.bns2 = nn.BatchNorm1d(64)
         #self.bns3 = nn.BatchNorm1d(128)
 
         self.fc1 = nn.Linear(65536, 512)
         self.fc2 = nn.Linear(519, 512)
 
-        self.fc_h_v = spectral_norm(nn.Linear(9600, 512))
-        self.fc_h_a = spectral_norm(nn.Linear(9600, 512))
+        self.fc_h_v = spectral_norm(nn.Linear(38400, 512))
+        self.fc_h_a = spectral_norm(nn.Linear(38400, 512))
         self.fc_z_v = NoisyLinear(512, self.atoms, std_init=args.noisy_std)
         self.fc_z_a = NoisyLinear(512, self.action_space * self.atoms, std_init=args.noisy_std)
 

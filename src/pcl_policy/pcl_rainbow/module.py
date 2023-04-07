@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pcl_policy.pcl_rainbow.util import sample_and_knn_group, sample_and_knn_group1
+from pcl_policy.pcl_rainbow.util import sample_and_knn_group, sample_and_knn_group1, sample_and_knn_group_
 
 
 class Embedding(nn.Module):
@@ -85,10 +85,11 @@ class SG(nn.Module):
     SG(sampling and grouping) module.
     """
 
-    def __init__(self, s, in_channels, out_channels):
+    def __init__(self, s, in_channels, out_channels, k):
         super(SG, self).__init__()
 
         self.s = s
+        self.k = k
 
         self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=False)
         self.conv2 = nn.Conv1d(out_channels, out_channels, kernel_size=1, bias=False)
@@ -102,7 +103,7 @@ class SG(nn.Module):
             coords: coordinates data with size of [B, N, 3]
         """
         x = x.permute(0, 2, 1)           # (B, N, in_channels//2)
-        xyz, new_feature = sample_and_knn_group1(s=self.s, k=k, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
+        xyz, new_feature, batch_index_arr01 = sample_and_knn_group_(s=self.s, k=k, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
         b, s, k, d = new_feature.size()
         new_feature = new_feature.permute(0, 1, 3, 2)
         new_feature = new_feature.reshape(-1, d, k)                               # [Bxs, in_channels, 32]
@@ -111,7 +112,7 @@ class SG(nn.Module):
         new_feature = F.relu(self.bn2(self.conv2(new_feature)))                   # [Bxs, in_channels, 32]
         new_feature = F.adaptive_max_pool1d(new_feature, 1).view(batch_size, -1)  # [Bxs, in_channels]
         new_feature = new_feature.reshape(b, s, -1).permute(0, 2, 1)              # [B, in_channels, s]
-        return xyz,new_feature
+        return xyz,new_feature, batch_index_arr01
 
 class SG_1(nn.Module):
     """
@@ -135,8 +136,8 @@ class SG_1(nn.Module):
             coords: coordinates data with size of [B, N, 3]
         """
         x = x.permute(0, 2, 1)           # (B, N, in_channels//2)
-        if self.s==512:
-            new_feature = sample_and_knn_group(s=self.s, k=24, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
+        if self.s==600:
+            new_feature = sample_and_knn_group(s=self.s, k=32, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
         else:
             new_feature = sample_and_knn_group1(s=self.s, k=16, coords=coords, features=x)
         b, s, k, d = new_feature.size()
@@ -144,121 +145,14 @@ class SG_1(nn.Module):
         new_feature = new_feature.reshape(-1, d, k)                               # [Bxs, in_channels, 32]
         batch_size = new_feature.size(0)
         new_feature = F.relu(self.bn1(self.conv1(new_feature)))                   # [Bxs, in_channels, 32]
-        #new_feature = F.relu(self.bn2(self.conv2(new_feature)))                   # [Bxs, in_channels, 32]
+        new_feature = F.relu(self.bn2(self.conv2(new_feature)))                   # [Bxs, in_channels, 32]
         new_feature = F.adaptive_max_pool1d(new_feature, 1).view(batch_size, -1)  # [Bxs, in_channels]
         new_feature = new_feature.reshape(b, s, -1).permute(0, 2, 1)              # [B, in_channels, s]
         return new_feature
 
 
 
-class SG_(nn.Module):
-    """
-    SG(sampling and grouping) module.
-    """
 
-    def __init__(self, s, in_channels, out_channels):
-        super(SG_, self).__init__()
-
-        self.s = s
-
-        self.conv1 = nn.Conv1d(2*in_channels, out_channels, kernel_size=1, bias=False)
-        self.conv2 = nn.Conv1d(out_channels, out_channels, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(out_channels)
-        self.bn2 = nn.BatchNorm1d(out_channels)
-        self.oa1 =OA_(32)
-        self.oa2 =OAS(32)
-        self.oa3 =OAS(32)
-        self.oa4 =OAS(32)
-        self.oa5 =OAS(32)
-        self.oa6 =OAS(32)
-        self.oa7 =OAS(32)
-        self.oa8 =OAS(32)
-        self.oa9 =OAS(32)
-        self.oa10 =OAS(32)
-        self.oa11 =OAS(32)
-        self.oa12 =OAS(32)
-        self.oa13 =OAS(32)
-        self.oa14 =OAS(32)
-        self.oa15 =OAS(32)
-        self.oa16 =OAS(32)    
-        self.oa1x =OAS(32)
-        self.oa2x =OAS(32)
-        self.oa3x =OAS(32)
-        self.oa4x =OAS(32)
-        self.oa5x =OAS(32)
-        self.oa6x =OAS(32)
-        self.oa7x =OAS(32)
-        self.oa8x =OAS(32)
-        self.oa9x =OAS(32)
-        self.oa10x =OAS(32)
-        self.oa11x =OAS(32)
-        self.oa12x =OAS(32)
-        self.oa13x =OAS(32)
-        self.oa14x =OAS(32)
-        self.oa15x =OAS(32)
-        self.oa16x =OAS(32)       
-    def forward(self, x, coords):
-        """
-        Input:
-            x: features with size of [B, in_channels//2, N]
-            coords: coordinates data with size of [B, N, 3]
-        """
-        x = x.permute(0, 2, 1)           # (B, N, in_channels//2)
-        new_xyz, new_feature = sample_and_knn_group1(s=self.s, k=16, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
-        #b, s, k, d = new_feature.size()
-        #new_feature = new_feature.permute(0, 1, 3, 2)
-        #new_feature = new_feature.reshape(-1, d, k)                               # [Bxs, in_channels, 32]
-        #batch_size = new_feature.size(0)
-        #print(new_feature.shape)
-        #new_feature = F.relu(self.bn1(self.conv1(new_feature)))                   # [Bxs, in_channels, 32]
-        #new_feature = F.relu(self.bn2(self.conv2(new_feature)))                   # [Bxs, in_channels, 32]
-        new_feature=self.attention_features(new_feature)
-        #new_feature = F.adaptive_max_pool1d(new_feature, 1).view(batch_size, -1)  # [Bxs, in_channels]
-        #new_feature = new_feature.reshape(b, s, -1).permute(0, 2, 1)              # [B, in_channels, s]
-        return new_xyz, new_feature
-
-    def attention_features(self,new_feature):
-        x1=self.oa1(new_feature[:,0,:,:])
-        x2=self.oa2(x1,new_feature[:,1,:,:])
-        x3=self.oa3(x2,new_feature[:,2,:,:])
-        x4=self.oa4(x3,new_feature[:,3,:,:])
-        x5=self.oa5(x4,new_feature[:,4,:,:])
-        x6=self.oa6(x5,new_feature[:,5,:,:])
-        x7=self.oa7(x6,new_feature[:,6,:,:])
-        x8=self.oa8(x7,new_feature[:,7,:,:])
-        x9=self.oa9(x8,new_feature[:,8,:,:])
-        x10=self.oa10(x9,new_feature[:,9,:,:])
-        x11=self.oa11(x10,new_feature[:,10,:,:])
-        x12=self.oa12(x11,new_feature[:,11,:,:])
-        x13=self.oa13(x12,new_feature[:,12,:,:])
-        x14=self.oa14(x13,new_feature[:,13,:,:])
-        x15=self.oa15(x14,new_feature[:,14,:,:])
-        x16=self.oa16(x15,new_feature[:,15,:,:])
-        xx1=self.oa1x(x16,new_feature[:,16,:,:])
-        xx2=self.oa2x(xx1,new_feature[:,17,:,:])
-        xx3=self.oa3x(xx2,new_feature[:,18,:,:])
-        xx4=self.oa4x(xx3,new_feature[:,19,:,:])
-        xx5=self.oa5x(xx4,new_feature[:,20,:,:])
-        xx6=self.oa6x(xx5,new_feature[:,21,:,:])
-        xx7=self.oa7x(xx6,new_feature[:,22,:,:])
-        xx8=self.oa8x(xx7,new_feature[:,23,:,:])
-        xx9=self.oa9x(xx8,new_feature[:,24,:,:])
-        xx10=self.oa10x(xx9,new_feature[:,25,:,:])
-        xx11=self.oa11x(xx10,new_feature[:,26,:,:])
-        xx12=self.oa12x(xx11,new_feature[:,27,:,:])
-        xx13=self.oa13x(xx12,new_feature[:,28,:,:])
-        xx14=self.oa14x(xx13,new_feature[:,29,:,:])
-        xx15=self.oa15x(xx14,new_feature[:,30,:,:])
-        xx16=self.oa16x(xx15,new_feature[:,31,:,:])     
-        #new_feature=torch.stack((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,xx1,xx2,x3,xx4,xx5,xx6,xx7,xx8,xx9,xx10,xx11,xx12,xx13,xx14,xx15,xx16),axis=1)
-        #b, s, k, d = new_feature.size()
-        new_feature = xx16.permute(0, 2, 1)
-        #new_feature = new_feature.reshape(-1, d, k)                               # [Bxs, in_channels, 32]
-        #atch_size = new_feature.size(0)
-        #new_feature = F.relu(self.bn1(self.conv1(new_feature))) 
-        #new_feature = F.adaptive_max_pool1d(new_feature, 1).view(batch_size, -1)  # [Bxs, in_channels]
-        #new_feature = new_feature.reshape(b, s, -1).permute(0, 2, 1)              # [B, in_channels, s]
-        return new_feature
 
 
 
@@ -359,32 +253,32 @@ class NeighborEmbedding_own(nn.Module):
     def __init__(self, samples=[256, 128, 64]):
         super(NeighborEmbedding_own, self).__init__()
 
-        self.conv1 = nn.Conv1d(3, 128, kernel_size=1, bias=False)
-        self.conv2 = nn.Conv1d(128, 128, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(128)
+        self.conv1 = nn.Conv1d(3, 64, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(64, 128, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm1d(64)
         self.bn2 = nn.BatchNorm1d(128)
 
-        self.sg0 = SG_1(s=512, in_channels=256, out_channels=256)
+        self.sg0 = SG_1(s=600, in_channels=256, out_channels=256)
         self.oa01 = OA(256)
         self.oa02 = OA(256)
-        self.sg1 = SG(s=samples[0], in_channels=512, out_channels=256)
+        self.sg1 = SG(s=64, in_channels=512, out_channels=256, k=32)
         self.oa11 = OA(256)
         self.oa12 = OA(256)
-        self.sg2 = SG(s=samples[1], in_channels=512, out_channels=256)
+        self.sg2 = SG(s=8, in_channels=512, out_channels=256, k=4)
         self.oa21 = OA(256)
         self.oa22 = OA(256)   
-        self.sg3 = SG(s=samples[2], in_channels=512, out_channels=256)
-        self.oa31 = OA(256)
-        self.oa32 = OA(256)   
-        self.oao1 =OAS(256)
-        self.oao2 =OAS(256)
-        self.oao3 =OAS(256)
-        self.linear = nn.Sequential(
-            nn.Conv1d(256, 256, kernel_size=1, bias=False),
-            nn.BatchNorm1d(256),
-            nn.LeakyReLU(negative_slope=0.2)
-        )
-        self.oa4 = OA(256)
+        #self.sg3 = SG(s=samples[2], in_channels=512, out_channels=256)
+        #self.oa31 = OA(256)
+        #self.oa32 = OA(256)   
+        #self.oao1 =OAS(256)
+        #self.oao2 =OAS(256)
+        #self.oao3 =OAS(256)
+        #self.linear = nn.Sequential(
+        #    nn.Conv1d(256, 256, kernel_size=1, bias=False),
+        #    nn.BatchNorm1d(256),
+        #    nn.LeakyReLU(negative_slope=0.2)
+        #)
+        #self.oa4 = OA(256)
     def forward(self, x):
         """
         Input:
@@ -398,25 +292,50 @@ class NeighborEmbedding_own(nn.Module):
         features0 = self.sg0(features, xyz) 
         features01=self.oa01(features0)
         features02=self.oa02(features01)
-        xyz1, features1 = self.sg1(features02, xyz,32)         # [B, 128, 512]
+        xyz1, features1, batch_index_arr01 = self.sg1(features02, xyz, k=16)         # [B, 128, 512]
         features11=self.oa11(features1)
         features12=self.oa12(features11)
-        xyz2, features2 = self.sg2(features12, xyz1,32)          # [B, 256, 256]
-        features21=self.oa21(features2)
-        features22=self.oa22(features21)
-        xyz3, features3 = self.sg3(features22, xyz2,32)          # [B, 256, 256]
-        features31=self.oa21(features3)
-        features32=self.oa22(features31)
-        #x = torch.cat([features1,features12,features2,  features22, features3, features32], dim=2)
-        #x=self.oa4(x)
-        x=self.oa4(features32)
-        x = torch.cat([x,x],dim=2)
-        x=self.oao1(x,features22)
-        x = torch.cat([x,x],dim=2)
-        x=self.oao2(x,features12)
-        x = torch.cat([x,x],dim=2)
-        x=self.oao3(x,features02)
+        xyz1, features2, batch_index_arr02 = self.sg2(features12, xyz1, k=4)         # [B, 128, 512]
+        features21=self.oa11(features2)
+        features22=self.oa12(features21)
+        features02 = features02.permute(0, 2, 1)
+        features12 = features12.permute(0, 2, 1)
+        features22 = features22.permute(0, 2, 1)
+        features12=self.index_points(features12, batch_index_arr02, features22) 
+        features02=self.index_points(features02, batch_index_arr01, features12)
+        x = features02.permute(0, 2, 1)
+        
+        
+        
+        #batch_index_arr02=batch_index_arr02.astype(int)
+        #batch_index_arr01=batch_index_arr01.astype(int)
+        #features02 = features02.permute(0, 2, 1)  # [B, N ,3]
+        #print(features02[0,batch_index_arr01[:,:],:].shape)
+        #features02[:,batch_index_arr01[:,:],:]=features12.permute(0, 2, 1)
+        #features02[:,batch_index_arr01[:,batch_index_arr02[:,:]][:],:]=features22.permute(0, 2, 1)
+        #features02 = features02.permute(0, 2, 1)
+
         return x
+
+
+    def index_points(self, points, idx, new_points):
+        """
+        Input:
+            points: input points data, [B, N, C]
+            idx: sample index data, [B, S]
+        
+        Output:
+            new_points:, indexed points data, [B, S, C]
+        """
+        device = points.device
+        B = points.shape[0]
+        view_shape = list(idx.shape)
+        view_shape[1:] = [1] * (len(view_shape) - 1)
+        repeat_shape = list(idx.shape)
+        repeat_shape[0] = 1
+        batch_indices = torch.arange(B, dtype=torch.long).to(device).view(view_shape).repeat(repeat_shape)
+        points[batch_indices, idx ,:] = new_points
+        return points
 
 
 class NeighborEmbedding_origing(nn.Module):
