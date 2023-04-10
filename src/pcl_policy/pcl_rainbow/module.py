@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pcl_policy.pcl_rainbow.util import sample_and_knn_group, sample_and_knn_group1
+from pcl_policy.pcl_rainbow.util import sample_and_knn_group, sample_and_knn_group1, sample_and_knn_group_
 
 
 class Embedding(nn.Module):
