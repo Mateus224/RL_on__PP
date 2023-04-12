@@ -352,7 +352,7 @@ from random import randint
 from typing import List, Optional, Tuple, Union
 
 import torch
-from pytorch3d import _C
+#from pytorch3d import _C
 
 #from .utils import masked_gather
 
