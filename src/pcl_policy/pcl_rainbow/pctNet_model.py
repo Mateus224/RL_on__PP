@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pcl_policy.pcl_rainbow.module import Embedding, NeighborEmbedding, OA, MHeadOA, SA
+from pcl_policy.pcl_rainbow.module import Embedding, NeighborEmbedding, NeighborEmbedding_own, NeighborEmbedding_origing, OA,OAO, MHeadOA, SA
 from torch.nn.utils import spectral_norm
 import math
 
@@ -123,8 +123,8 @@ class PCT_M(nn.Module):
 
         self.neighbor_embedding = NeighborEmbedding(samples)
         #self.neighbor_embedding = Embedding(3,128)
-        self.oa11 = MHeadOA(128)
-        self.oa12 = MHeadOA(128)
+        self.oa11 = MHeadOA(256)
+        #self.oa12 = MHeadOA(128)
         #self.oa13 = OA(128)
         #self.oa14 = OA(128)
 
@@ -145,33 +145,29 @@ class PCT_M(nn.Module):
         )
     def forward(self, x):
         
-        x1,x2 = self.neighbor_embedding(x)
-        x_cat= torch.cat([ x1, x2], dim=1)
-        x11 = self.oa11(x1)
-        x12 = self.oa12(x2)
-        #x13 = self.oa13(x3)
-        #x14 = self.oa14(x4)
-        x = torch.cat([ x11, x12], dim=1)
-        #x = self.linear(x)
-        x11 = self.oa2(x)
+        x1,x2,x3,x4 = self.neighbor_embedding(x)
+        x_cat= torch.cat([ x1, x2,  x3, x4], dim=1)
+        x10 = self.oa11(x_cat)
+        x11 = self.oa2(x10)
         x12 = self.oa3(x11)
         x13 = self.oa4(x12)
-        x = torch.cat([x_cat, x, x11, x12, x13], dim=1)
+        x = torch.cat([x_cat, x10, x11, x12, x13], dim=1)
         x = self.linear1(x)
         x_max = torch.max(x, dim=-1)[0]
         #x_mean = torch.mean(x, dim=-1)
 
         return x, x_max#, x_mean
 
-class PCT(nn.Module):
-    def __init__(self, samples=[512, 512]):
+class PCT_E(nn.Module):
+    def __init__(self, samples=[300,150,512]):
         super().__init__()
 
-        self.neighbor_embedding = NeighborEmbedding(samples)
-        self.oa1 = OA(256)
-        self.oa2 = OA(256)
-        self.oa3 = OA(256)
-        self.oa4 = OA(256)
+        self.neighbor_embedding = NeighborEmbedding_own(samples)
+        #self.neighbor_embedding = NeighborEmbedding_origing(samples)
+        self.oa1 = OA(256) #MHeadOA(256)
+        self.oa2 = OA(256) #MHeadOA(256)
+        self.oa3 = OA(256) #MHeadOA(256)
+        self.oa4 = OA(256) #MHeadOA(256)
 
         self.linear = nn.Sequential(
             nn.Conv1d(1280, 1280, kernel_size=1, bias=False),
@@ -180,14 +176,47 @@ class PCT(nn.Module):
         )
 
     def forward(self, x):
-        x0 = self.neighbor_embedding(x)
-        #x0= torch.cat([ x1, x2], dim=1)
-        x1 = self.oa1(x0)
+        x = self.neighbor_embedding(x)
+        x1 = self.oa1(x)
         x2 = self.oa2(x1)
         x3 = self.oa3(x2)
         x4 = self.oa4(x3)
 
-        x = torch.cat([x0, x1, x2, x3, x4], dim=1)
+        x = torch.cat([x, x1, x2, x3, x4], dim=1)
+        x = self.linear(x)
+        #c = nn.MaxPool1d(x.size(-1))(x)
+        #c = c.view(-1, 1024)
+        #c = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
+        x_max = torch.max(x, dim=-1)[0]
+        #x_mean = torch.mean(x, dim=-1)
+
+        return x, x_max#, x_mean
+
+class PCT(nn.Module):
+    def __init__(self, samples=[128, 32]):
+        super().__init__()
+
+        self.neighbor_embedding = NeighborEmbedding(samples)
+        #self.neighbor_embedding = NeighborEmbedding_origing(samples)
+        self.oa1 = OA(512)#MHeadOA(256)
+        self.oa2 = OA(512)#MHeadOA(256)
+        self.oa3 = OA(512)#MHeadOA(256)
+        self.oa4 = OA(512)#MHeadOA(256)
+
+        self.linear = nn.Sequential(
+            nn.Conv1d(2560, 2560, kernel_size=1, bias=False),
+            nn.BatchNorm1d(2560),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+
+    def forward(self, x):
+        x = self.neighbor_embedding(x)
+        x1 = self.oa1(x)
+        x2 = self.oa2(x1)
+        x3 = self.oa3(x2)
+        x4 = self.oa4(x3)
+
+        x = torch.cat([x, x1, x2, x3, x4], dim=1)
         x = self.linear(x)
         #c = nn.MaxPool1d(x.size(-1))(x)
         #c = c.view(-1, 1024)
@@ -202,12 +231,12 @@ class Classification(nn.Module):
     def __init__(self, num_categories=40):
         super().__init__()
 
-        self.linear1 = nn.Linear(1024, 512, bias=False)
-        self.linear2 = nn.Linear(512, 256)
-        self.linear3 = nn.Linear(256, num_categories)
+        self.linear1 = nn.Linear(2560, 512, bias=False)
+        self.linear2 = nn.Linear(512, 128)
+        self.linear3 = nn.Linear(128, num_categories)
 
         self.bn1 = nn.BatchNorm1d(512)
-        self.bn2 = nn.BatchNorm1d(256)
+        self.bn2 = nn.BatchNorm1d(128)
 
         self.dp1 = nn.Dropout(p=0.5)
         self.dp2 = nn.Dropout(p=0.5)
@@ -455,27 +484,27 @@ class Conv_transformer(nn.Module):
         #self.neighbor_embedding = NeighborEmbedding(samples)
         self.neighbor_embedding = Embedding(3,256)
 
-        self.oa11 = OAO(64)
-        self.oa12 = OAO(64)
-        self.oa13 = OAO(64)
-        self.oa14 = OAO(64)
+        self.oa11 = OA(64)
+        self.oa12 = OA(64)
+        self.oa13 = OA(64)
+        self.oa14 = OA(64)
 
-        self.oa21 = OA(192)
-        self.oa22 = OAO(192)
+        self.oa21 = OA(128)
+        self.oa22 = OA(128)
 
-        self.oa23 = OA(192)
-        self.oa24 = OAO(192)
+        self.oa23 = OA(128)
+        self.oa24 = OA(128)
 
-        self.oa31 = OA(960)
-        self.oa32 = OAO(960)
+        self.oa31 = OA(256)
+        self.oa32 = OA(256)
 
 
 
-        self.linearLayer_weights_11 = nn.Conv1d(384, 384, kernel_size=1, bias=False)
-        self.linearLayer_weights_12 = nn.Conv1d(384, 384, kernel_size=1, bias=False)
+        self.linearLayer_weights_11 = nn.Conv1d(256, 256, kernel_size=1, bias=False)
+        self.linearLayer_weights_12 = nn.Conv1d(256, 256, kernel_size=1, bias=False)
 
-        self.linearLayer_weights_2 = nn.Conv1d(960, 960, kernel_size=1, bias=False)
-        self.linearLayer_weights_3 = nn.Conv1d(2400, 1024, kernel_size=1, bias=False)
+        self.linearLayer_weights_2 = nn.Conv1d(512, 512, kernel_size=1, bias=False)
+        self.linearLayer_weights_3 = nn.Conv1d(1280, 1280, kernel_size=1, bias=False)
         self.linearLayer_weights_4 = nn.Conv1d(320, 64, kernel_size=1, bias=False)
 
         self.linearLayer_1 = nn.Sequential(
@@ -505,30 +534,37 @@ class Conv_transformer(nn.Module):
         x14 = self.oa14(x04)
 
 
-        x_cat1 = torch.cat([x, x11, x12, x13, x14], dim=1)
+        x_cat1 = torch.cat([x11, x12, x13, x14], dim=1)
         #print(x_cat1.shape)
         #x_cat2 = torch.cat([x03, x04, x13, x14], dim=1)
 
         x_11 =  F.relu(self.linearLayer_weights_11(x_cat1))
         #x_12 =  F.relu(self.linearLayer_weights_12(x_cat2))
 
-        x01 = x_11.narrow(1,0,192)
-        x02 = x_11.narrow(1,192,192)
+        x01 = x_11.narrow(1,0,128)
+        x02 = x_11.narrow(1,128,128)
 
         x1 = self.oa21(x01)
-        x2 = self.oa22(x1)
+        x2 = self.oa23(x02)
+        
 
-        x3 = self.oa23(x02)
+        x_cat2 = torch.cat([ x1, x2], dim=1)
+        x =  F.relu(self.linearLayer_weights_2(x_cat2))
+        
+        x01 = x.narrow(1,0,128)
+        x02 = x_11.narrow(1,128,128)
+
         x4 = self.oa24(x3)        
-
-        x_cat = torch.cat([x_11, x1, x2, x3, x4], dim=1)
-        x =  F.relu(self.linearLayer_weights_2(x_cat))
+        x2 = self.oa22(x1)
+        
+        x_cat3 = torch.cat([ x1, x2, x3, x4], dim=1)
+        x =  F.relu(self.linearLayer_weights_2(x_cat2))
 
         x1 = self.oa31(x)
         x2 = self.oa32(x1)
 
-        x_cat = torch.cat([x, x1, x2], dim=1)
-        x =  F.relu(self.linearLayer_weights_3(x_cat))
+        x_cat3 = torch.cat([x, x_cat1,x_cat2, x1, x2], dim=1)
+        x =  F.relu(self.linearLayer_weights_3(x_cat3))
         """
         x1 = self.oa13(x03)
         x2 = self.oa23(x1)
@@ -536,7 +572,6 @@ class Conv_transformer(nn.Module):
         x4 = self.oa43(x3)
         x_cat = torch.cat([x03, x1, x2, x3, x4], dim=1)
         x33 =  F.relu(self.linearLayer_weights_3(x_cat))
-
         x1 = self.oa14(x04)
         x2 = self.oa24(x1)
         x3 = self.oa34(x2)
@@ -548,7 +583,6 @@ class Conv_transformer(nn.Module):
         f_x=self.linearLayer_1(x_cat)
         f_x = self.Hoa(f_x)
         x=self.linearLayer_2(f_x)
-
         #c = nn.MaxPool1d(x.size(-1))(x)
         #c = c.view(-1, 1024)
         """
@@ -654,20 +688,20 @@ class Policy2(nn.Module):
         self.action_space = actions
         self.atoms =args.atoms
 
-        self.convs1 = nn.Conv1d(2560, 512, 1)
-        self.convs2 = nn.Conv1d(512, 256, 1)
-        self.convs3 = nn.Conv1d(256, 128, 1)
+        self.convs1 = nn.Conv1d(2560, 1024, 1)
+        self.convs2 = nn.Conv1d(1024, 256, 1)
+        self.convs3 = nn.Conv1d(256, 64, 1)
         #self.convs4 = nn.Conv1d(256, 128, 1)
 
-        self.bns1 = nn.BatchNorm1d(128)
+        self.bns1 = nn.BatchNorm1d(256)
         self.bns2 = nn.BatchNorm1d(64)
         #self.bns3 = nn.BatchNorm1d(128)
 
         self.fc1 = nn.Linear(65536, 512)
         self.fc2 = nn.Linear(519, 512)
 
-        self.fc_h_v = spectral_norm(nn.Linear(76800, 512))
-        self.fc_h_a = spectral_norm(nn.Linear(76800, 512))
+        self.fc_h_v = spectral_norm(nn.Linear(38400, 512))
+        self.fc_h_a = spectral_norm(nn.Linear(38400, 512))
         self.fc_z_v = NoisyLinear(512, self.atoms, std_init=args.noisy_std)
         self.fc_z_a = NoisyLinear(512, self.action_space * self.atoms, std_init=args.noisy_std)
 
@@ -708,12 +742,12 @@ class Multihead_PCT_RL(nn.Module):
     def __init__(self, args, actions):
         super().__init__()
     
-        self.encoder = PCT()
+        self.encoder = PCT_E()
         self.policy2 = Policy2(args, actions)
 
     def forward(self, x, position, log=False):
-        x, mean = self.encoder(x)
-        x = self.policy2(x, mean, log)
+        x, max_ = self.encoder(x)
+        x = self.policy2(x, max_, log)
         return x
 
     def reset_noise(self):

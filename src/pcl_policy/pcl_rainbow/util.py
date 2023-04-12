@@ -1,9 +1,6 @@
 import torch
 import torch.nn.functional as F
 #from pointnet2_ops import pointnet2_utils
-#from pytorch3d.ops import sample_farthest_points
-
-
 
 
 def cal_loss(pred, ground_truth, smoothing=True):
@@ -34,11 +31,9 @@ def square_distance(src, dst):
     sum(dst^2, dim=-1) = xm*xm + ym*ym + zm*zm;
     dist = (xn - xm)^2 + (yn - ym)^2 + (zn - zm)^2
          = sum(src**2,dim=-1)+sum(dst**2,dim=-1)-2*src^T*dst
-
     Input:
         src: source points, [B, N, C]
         dst: target points, [B, M, C]
-
     Output:
         dist: per-point square distance, [B, N, M]
     """
@@ -53,7 +48,6 @@ def square_distance(src, dst):
 def query_ball_point(radius, nsample, xyz, new_xyz):
     """
     Ball query.
-
     Input:
         radius: local region radius
         nsample: max sample number in local region
@@ -79,7 +73,6 @@ def query_ball_point(radius, nsample, xyz, new_xyz):
 def knn_point(k, xyz, new_xyz):
     """
     K nearest neighborhood.
-
     Input:
         k: max sample number in local region
         xyz: all points, [B, N, C]
@@ -93,7 +86,6 @@ def knn_point(k, xyz, new_xyz):
     return group_idx
 
 
-
 def index_points(points, idx):
     """
     Input:
@@ -103,7 +95,6 @@ def index_points(points, idx):
     Output:
         new_points:, indexed points data, [B, S, C]
     """
-    
     device = points.device
     B = points.shape[0]
     view_shape = list(idx.shape)
@@ -118,7 +109,6 @@ def index_points(points, idx):
 def sample_and_ball_group(s, radius, n, coords, features):
     """
     Sampling by FPS and grouping by ball query.
-
     Input:
         s[int]: number of points to be sampled by FPS
         k[int]: number of points to be grouped into a neighbor by ball query
@@ -140,7 +130,6 @@ def sample_and_ball_group(s, radius, n, coords, features):
 
     # ball_query grouping
     idx = query_ball_point(radius, n, coords, new_coords)              # [B, s, n]
-    
     grouped_features = index_points(features, idx)                     # [B, s, n, D]
     
     # Matrix sub
@@ -155,7 +144,6 @@ def sample_and_ball_group(s, radius, n, coords, features):
 def sample_and_knn_group(s, k, coords, features):
     """
     Sampling by FPS and grouping by KNN.
-
     Input:
         s[int]: number of points to be sampled by FPS
         k[int]: number of points to be grouped into a neighbor by KNN
@@ -191,9 +179,10 @@ def sample_and_knn_group(s, k, coords, features):
     aggregated_features = torch.cat([grouped_features_norm, features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1) 
     # Concat
     #aggregated_features = torch.cat([grouped_features_norm, new_features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1)  # [B, s, k, 2D]
-    return  coords, aggregated_features#1, grouped_features2#, grouped_features3, grouped_features4  # [B, s, 3], [B, s, k, 2D]
+    return  aggregated_features#1, grouped_features2#, grouped_features3, grouped_features4  # [B, s, 3], [B, s, k, 2D]
 
-def sample_and_knn_group1(s, k, coords, features, t):
+
+def sample_and_knn_group1(s, k, coords, features, t=False):
     """
     Sampling by FPS and grouping by KNN.
     Input:
@@ -223,6 +212,7 @@ def sample_and_knn_group1(s, k, coords, features, t):
     #fps_idx = pointnet2_utils.furthest_point_sample(coords, s).long()  # [B, s]
     #batch_index=batch_index#.long()#torch.from_numpy(batch_index).long()
     new_coords = index_points(coords, batch_index)                      # [B, s, 3]
+    
     #print(new_coords.shape)
     new_features = index_points(features, batch_index)                     # [B, s, D]
     # K-nn grouping
@@ -237,7 +227,7 @@ def sample_and_knn_group1(s, k, coords, features, t):
     if t==False:
         aggregated_features = torch.cat([grouped_features_norm, new_features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1)  # [B, s, k, 2D]
 
-        return new_coords, aggregated_features 
+        return new_coords, aggregated_features, batch_index
     else:
         return new_coords, grouped_features_norm 
 
@@ -299,6 +289,141 @@ class FPS:
     @staticmethod
     def __distance__(a, b):
         return np.linalg.norm(a - b, ord=2, axis=2)
+
+
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+
+def sample_and_knn_group_(s, k, coords, features):
+    """
+    Sampling by FPS and grouping by KNN.
+    Input:
+        s[int]: number of points to be sampled by FPS
+        k[int]: number of points to be grouped into a neighbor by KNN
+        coords[tensor]: input points coordinates data with size of [B, N, 3]
+        features[tensor]: input points features data with size of [B, N, D]
+    
+    Returns:
+        new_coords[tensor]: sampled and grouped points coordinates by FPS with size of [B, s, k, 3]
+        new_features[tensor]: sampled and grouped points features by FPS with size of [B, s, k, 2D]
+    """
+    batch_size = coords.shape[0]
+    coords = coords.contiguous()
+
+    # FPS sampling
+    fps_idx = sample_farthest_points(coords,None, s).long()  # [B, s]
+    new_coords = index_points(coords, fps_idx)                         # [B, s, 3]
+    new_features = index_points(features, fps_idx)                     # [B, s, D]
+
+    # K-nn grouping
+    idx = knn_point(k, coords, new_coords)                                              # [B, s, k]
+    grouped_features = index_points(features, idx)                                      # [B, s, k, D]
+    
+    # Matrix sub
+    grouped_features_norm = grouped_features - new_features.view(batch_size, s, 1, -1)  # [B, s, k, D]
+
+    # Concat
+    aggregated_features = torch.cat([grouped_features_norm, new_features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1)  # [B, s, k, 2D]
+
+    return new_coords, aggregated_features, fps_idx  # [B, s, 3], [B, s, k, 2D]
+
+
+
+
+from random import randint
+from typing import List, Optional, Tuple, Union
+
+import torch
+from pytorch3d import _C
+
+#from .utils import masked_gather
+
+
+
+def sample_farthest_points(
+    points: torch.Tensor,
+    lengths: Optional[torch.Tensor] = None,
+    K: Union[int, List, torch.Tensor] = 50,
+    random_start_point: bool = False,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Iterative farthest point sampling algorithm [1] to subsample a set of
+    K points from a given pointcloud. At each iteration, a point is selected
+    which has the largest nearest neighbor distance to any of the
+    already selected points.
+
+    Farthest point sampling provides more uniform coverage of the input
+    point cloud compared to uniform random sampling.
+
+    [1] Charles R. Qi et al, "PointNet++: Deep Hierarchical Feature Learning
+        on Point Sets in a Metric Space", NeurIPS 2017.
+
+    Args:
+        points: (N, P, D) array containing the batch of pointclouds
+        lengths: (N,) number of points in each pointcloud (to support heterogeneous
+            batches of pointclouds)
+        K: samples required in each sampled point cloud (this is typically << P). If
+            K is an int then the same number of samples are selected for each
+            pointcloud in the batch. If K is a tensor is should be length (N,)
+            giving the number of samples to select for each element in the batch
+        random_start_point: bool, if True, a random point is selected as the starting
+            point for iterative sampling.
+
+    Returns:
+        selected_points: (N, K, D), array of selected values from points. If the input
+            K is a tensor, then the shape will be (N, max(K), D), and padded with
+            0.0 for batch elements where k_i < max(K).
+        selected_indices: (N, K) array of selected indices. If the input
+            K is a tensor, then the shape will be (N, max(K), D), and padded with
+            -1 for batch elements where k_i < max(K).
+    """
+    N, P, D = points.shape
+    device = points.device
+
+    # Validate inputs
+    if lengths is None:
+        lengths = torch.full((N,), P, dtype=torch.int64, device=device)
+    else:
+        if lengths.shape != (N,):
+            raise ValueError("points and lengths must have same batch dimension.")
+        if lengths.max() > P:
+            raise ValueError("A value in lengths was too large.")
+
+    # TODO: support providing K as a ratio of the total number of points instead of as an int
+    if isinstance(K, int):
+        K = torch.full((N,), K, dtype=torch.int64, device=device)
+    elif isinstance(K, list):
+        K = torch.tensor(K, dtype=torch.int64, device=device)
+
+    if K.shape[0] != N:
+        raise ValueError("K and points must have the same batch dimension")
+
+    # Check dtypes are correct and convert if necessary
+    if not (points.dtype == torch.float32):
+        points = points.to(torch.float32)
+    if not (lengths.dtype == torch.int64):
+        lengths = lengths.to(torch.int64)
+    if not (K.dtype == torch.int64):
+        K = K.to(torch.int64)
+
+    # Generate the starting indices for sampling
+    start_idxs = torch.zeros_like(lengths)
+    if random_start_point:
+        for n in range(N):
+            # pyre-fixme[6]: For 1st param expected `int` but got `Tensor`.
+            start_idxs[n] = torch.randint(high=lengths[n], size=(1,)).item()
+
+    with torch.no_grad():
+        # pyre-fixme[16]: `pytorch3d_._C` has no attribute `sample_farthest_points`.
+        idx = _C.sample_farthest_points(points, lengths, K, start_idxs)
+    #sampled_points = masked_gather(points, idx)
+
+    return idx
+
 
 class Logger():
     def __init__(self, path):
@@ -437,6 +562,7 @@ def sample_farthest_points(
     #sampled_points = masked_gather(points, idx)
 
     return idx
+
 
 
 if __name__ == '__main__':
