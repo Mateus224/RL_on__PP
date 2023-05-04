@@ -187,7 +187,7 @@ class SG_4(nn.Module):
         feature_s2 = x.narrow(1,192,64)
         feature_k = feature_k.permute(0, 2, 1)    
         #feature_k2 = feature_k2.permute(0, 2, 1)       
-        new_feature1, new_feature2 = sample_and_knn_group1(s=self.s, k=22, coords=coords, features=feature_k)  # [B, s, 3], [B, s, 32, in_channels]
+        new_feature1, new_feature2 = sample_and_knn_group_(s=self.s, k=22, coords=coords, features=feature_k)  # [B, s, 3], [B, s, 32, in_channels]
         #new_feature2 = sample_and_knn_group(s=self.s, k=22, coords=coords, features=feature_k2)
         #new_feature1 = F.relu(self.bnE1(self.convE1(new_feature1)))                   # [Bxs, in_channels, 32]
         #features1 = F.relu(self.bnE2(self.convE2(new_feature1)))  
@@ -253,32 +253,55 @@ class NeighborEmbedding_own(nn.Module):
     def __init__(self, samples=[256, 128, 64]):
         super(NeighborEmbedding_own, self).__init__()
 
-        self.conv1 = nn.Conv1d(3, 64, kernel_size=1, bias=False)
-        self.conv2 = nn.Conv1d(64, 128, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(64)
-        self.bn2 = nn.BatchNorm1d(128)
+        self.conv1 = nn.Conv1d(3, 96, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(64, 64, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm1d(96)
+        self.bn2 = nn.BatchNorm1d(64)
 
-        self.sg0 = SG_1(s=600, in_channels=256, out_channels=256)
-        self.oa01 = OA(256)
-        self.oa02 = OA(256)
-        self.sg1 = SG(s=64, in_channels=512, out_channels=256, k=32)
-        self.oa11 = OA(256)
-        self.oa12 = OA(256)
-        self.sg2 = SG(s=8, in_channels=512, out_channels=256, k=4)
-        self.oa21 = OA(256)
-        self.oa22 = OA(256)   
-        #self.sg3 = SG(s=samples[2], in_channels=512, out_channels=256)
-        #self.oa31 = OA(256)
-        #self.oa32 = OA(256)   
-        #self.oao1 =OAS(256)
-        #self.oao2 =OAS(256)
-        #self.oao3 =OAS(256)
-        #self.linear = nn.Sequential(
-        #    nn.Conv1d(256, 256, kernel_size=1, bias=False),
-        #    nn.BatchNorm1d(256),
-        #    nn.LeakyReLU(negative_slope=0.2)
-        #)
-        #self.oa4 = OA(256)
+        #self.sg0 = SG(s=400, in_channels=128, out_channels=256, k=32)
+        #self.oa01 = OA(256)
+        #self.oa02 = OA(256)
+        self.oa01 = OA(96)
+        self.oa11 = OA(96)
+        self.sg1 = SG(s=128, in_channels=192, out_channels=192, k=32)
+        self.oa02 = OA(192)
+        self.oa12 = OA(192)
+        #self.oa12 = OA(256)
+        self.sg2 = SG(s=16, in_channels=384, out_channels=384, k=16)
+        self.oa03 = OA(384)
+        self.oa13 = OA(384)
+        
+
+        self.oas1 =OA_2(384)
+        self.oa04 = OA(192)
+        self.oa14 = OA(192)
+        self.oas2 =OA_2(192) 
+        self.oa1 = OA(96)
+        self.oa2 = OA(96)       
+        #self.oa31 = OA(256)  
+        #self.oa32 = OA(256)
+        #self.oa33 = OA(256)  
+        #self.oa34 = OA(256)
+        self.linear0 = nn.Sequential(
+            nn.Conv1d(96, 256, kernel_size=1, bias=True),
+            nn.BatchNorm1d(256),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+        self.linear02 = nn.Sequential(
+            nn.Conv1d(256, 256, kernel_size=1, bias=False),
+            nn.BatchNorm1d(256),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+        self.linear1 = nn.Sequential(
+            nn.Conv1d(1536, 1536, kernel_size=1, bias=False),
+            nn.BatchNorm1d(1536),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+        self.linear = nn.Sequential(
+            nn.Conv1d(288, 288, kernel_size=1, bias=False),
+            nn.BatchNorm1d(288),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
     def forward(self, x):
         """
         Input:
@@ -286,39 +309,36 @@ class NeighborEmbedding_own(nn.Module):
         """
         xyz = x.permute(0, 2, 1)  # [B, N ,3]
 
-        features = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
-        features = F.relu(self.bn2(self.conv2(features))) # [B, 64, N]
-
-        features0 = self.sg0(features, xyz) 
-        features01=self.oa01(features0)
-        features02=self.oa02(features01)
-        xyz1, features1, batch_index_arr01 = self.sg1(features02, xyz, k=16)         # [B, 128, 512]
-        features11=self.oa11(features1)
-        features12=self.oa12(features11)
-        xyz1, features2, batch_index_arr02 = self.sg2(features12, xyz1, k=4)         # [B, 128, 512]
-        features21=self.oa11(features2)
-        features22=self.oa12(features21)
-        features02 = features02.permute(0, 2, 1)
-        features12 = features12.permute(0, 2, 1)
-        features22 = features22.permute(0, 2, 1)
-        features12=self.index_points(features12, batch_index_arr02, features22) 
-        features02=self.index_points(features02, batch_index_arr01, features12)
-        x = features02.permute(0, 2, 1)
+        x = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
+        x = F.relu(self.bn2(self.conv2(x))) # [B, 64, N]
+        #x0=self.oa01(x)
+        #xyz, features0, _ = self.sg0(features, xyz, k=16) 
+        #features01=self.oa01(features0)
+        xyz1, features1, batch_index_arr01 = self.sg1(x, xyz, k=32)         # [B, 128, 512]
+        features1=self.oa02(features1)
+        features1=self.oa12(features1)
+        xyz1, features2, batch_index_arr02 = self.sg2(features1, xyz1, k=16)         # [B, 128, 512]
+        features2=self.oa03(features2)
+        features2=self.oa13(features2)
         
+        x = self.oas1(features2, features1)
+        x = self.oa04(x)
+        x1 = self.oas2(x, x0)
+        x2 = self.oa1(x1)
+        x3 = self.oa2(x2)
+        #x3 = self.oa32(x2)
+        #x4 = self.oa33(x3)
+        #x5 = self.oa34(x4)
+        x = torch.cat([x1, x2, x3], dim=1)
+        x = self.linear(x)
+        x_max = torch.max(x, dim=-1)[0]
+
+        return x, x_max   
         
-        
-        #batch_index_arr02=batch_index_arr02.astype(int)
-        #batch_index_arr01=batch_index_arr01.astype(int)
-        #features02 = features02.permute(0, 2, 1)  # [B, N ,3]
-        #print(features02[0,batch_index_arr01[:,:],:].shape)
-        #features02[:,batch_index_arr01[:,:],:]=features12.permute(0, 2, 1)
-        #features02[:,batch_index_arr01[:,batch_index_arr02[:,:]][:],:]=features22.permute(0, 2, 1)
-        #features02 = features02.permute(0, 2, 1)
-
-        return x
 
 
-    def index_points(self, points, idx, new_points):
+
+    def index_points(self, points, idx, new_points, nr):
         """
         Input:
             points: input points data, [B, N, C]
@@ -334,7 +354,11 @@ class NeighborEmbedding_own(nn.Module):
         repeat_shape = list(idx.shape)
         repeat_shape[0] = 1
         batch_indices = torch.arange(B, dtype=torch.long).to(device).view(view_shape).repeat(repeat_shape)
-        points[batch_indices, idx ,:] = new_points
+        if nr == True:
+            points[batch_indices, idx ,:]=self.oas1(points[batch_indices, idx ,:].permute(0, 2, 1), new_points.permute(0, 2, 1)).permute(0, 2, 1)
+        else:
+            points[batch_indices, idx ,:]=self.oas2(points[batch_indices, idx ,:].permute(0, 2, 1), new_points.permute(0, 2, 1)).permute(0, 2, 1)
+        #points[batch_indices, idx ,:] = new_points
         return points
 
 
@@ -394,6 +418,136 @@ class MHeadOA(nn.Module):
         x=self.linear(x)
         return x
 
+
+class OA_0(nn.Module):
+    """
+    Offset-Attention Module.
+    """
+    
+    def __init__(self, channels):
+        super(OA_0, self).__init__()
+
+        self.q_conv = nn.Conv1d(channels, channels , 1, bias=False)
+        self.k_conv = nn.Conv1d(channels, channels, 1, bias=False)
+        #self.q_conv.weight = self.k_conv.weight
+        self.v_conv = nn.Conv1d(channels, channels , 1)
+        #self.q_conv = nn.Conv1d(3, 64 , 1, bias=False)
+        #self.k_conv = nn.Conv1d(3, 64 , 1, bias=False)
+        #self.q_conv.weight = self.k_conv.weight
+        #self.v_conv = nn.Conv1d(channels, channels, 1)
+
+        self.trans_conv = nn.Conv1d(channels , channels , 1)
+        self.after_norm = nn.BatchNorm1d(channels)
+        
+        self.act = nn.ReLU()
+        self.softmax = nn.Softmax(dim=-1)  # change dim to -2 and change the sum(dim=1, keepdims=True) to dim=2
+
+    def forward(self, x,q):
+        """
+        Input:
+            x: [B, de, N]
+        
+        Output:
+            x: [B, de, N]
+        """
+        x_q = self.q_conv(q).permute(0, 2, 1)
+        
+        x_k = self.k_conv(x)    
+        x_v = self.v_conv(x).permute(0, 2, 1)
+        energy = torch.bmm(  x_q, x_k)
+        attention = self.softmax(energy)
+        attention = attention / (1e-9 + attention.sum(dim=1, keepdims=True))  # here
+        x_r = torch.bmm(attention, x_v).permute(0, 2, 1)
+        x_r = self.act(self.after_norm(self.trans_conv( q-x_r)))
+        x_r = q + x_r
+        #x = self.act(self.after_norm(self.trans_conv(x_r)))
+
+        return x_r
+
+class OA_1(nn.Module):
+    """
+    Offset-Attention Module.
+    """
+    
+    def __init__(self, channels):
+        super(OA_1, self).__init__()
+
+        self.q_conv = nn.Conv1d(channels, channels , 1, bias=False)
+        self.k_conv = nn.Conv1d(channels, channels, 1, bias=False)
+        #self.q_conv.weight = self.k_conv.weight
+        self.v_conv = nn.Conv1d(channels, channels , 1)
+        #self.q_conv = nn.Conv1d(3, 64 , 1, bias=False)
+        #self.k_conv = nn.Conv1d(3, 64 , 1, bias=False)
+        #self.q_conv.weight = self.k_conv.weight
+        #self.v_conv = nn.Conv1d(channels, channels, 1)
+
+        self.trans_conv = nn.Conv1d(channels , channels , 1)
+        self.after_norm = nn.BatchNorm1d(channels)
+        
+        self.act = nn.ReLU()
+        self.softmax = nn.Softmax(dim=-1)  # change dim to -2 and change the sum(dim=1, keepdims=True) to dim=2
+
+    def forward(self,q, x):
+        """
+        Input:
+            x: [B, de, N]
+        
+        Output:
+            x: [B, de, N]
+        """
+        x_q = self.q_conv(q).permute(0, 2, 1)
+        
+        x_k = self.k_conv(x)    
+        x_v = self.v_conv(x)
+        energy = torch.bmm(x_q, x_k)
+        attention = self.softmax(energy)
+        attention = attention / (1e-9 + attention.sum(dim=1, keepdims=True))  # here
+        x_r = torch.bmm(x_v, torch.cat([attention,attention,attention,attention], dim=1))
+        x_r = self.act(self.after_norm(self.trans_conv( x-x_r)))
+        x_r = x + x_r
+        #x = self.act(self.after_norm(self.trans_conv(x_r)))
+
+        return x_r
+
+class OA_2(nn.Module):
+    """
+    Offset-Attention Module.
+    """
+    
+    def __init__(self, channels_m):
+        super(OA_2, self).__init__()
+
+        #q= 32 256
+        #k= 128   128
+
+        self.q_conv = nn.Conv1d(channels_m, channels_m//2 , 1, bias=False)
+        self.k_conv = nn.Conv1d(channels_m//2, channels_m//2, 1, bias=False)
+        self.v_conv = nn.Conv1d(channels_m, channels_m//2 , 1)
+        self.trans_conv = nn.Conv1d(channels_m//2 , channels_m//2 , 1)
+        self.after_norm = nn.BatchNorm1d(channels_m//2)
+        
+        self.act = nn.ReLU()
+        self.softmax = nn.Softmax(dim=-1)  # change dim to -2 and change the sum(dim=1, keepdims=True) to dim=2
+
+    def forward(self,q, x):
+        """
+        Input:
+            x: [B, de, N]
+        
+        Output:
+            x: [B, de, N]
+        """
+        x_q = self.q_conv(q).permute(0, 2, 1)
+        
+        x_k = self.k_conv(x)    
+        x_v = self.v_conv(q)
+        energy = torch.bmm(x_q, x_k)
+        attention = self.softmax(energy)
+        attention = attention / (1e-9 + attention.sum(dim=1, keepdims=True))  # here
+        x_r = torch.bmm(x_v, attention)
+        x_r = self.act(self.after_norm(self.trans_conv(x-x_r)))
+        x = x_r+ x
+        return x
 
 class OA(nn.Module):
     """
@@ -530,6 +684,7 @@ class OAS(nn.Module):
         attention = self.softmax(energy)
         attention = attention / (1e-9 + attention.sum(dim=1, keepdims=True))  # here
 
+        print(x_v.shape, attention.shape)
         x_r = torch.bmm(x_v, attention)
         x_r = self.act(self.after_norm(self.trans_conv(x - x_r)))
         x = x + x_r

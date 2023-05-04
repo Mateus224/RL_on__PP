@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-#from pointnet2_ops import pointnet2_utils
+from pointnet2_ops import pointnet2_utils
 
 
 def cal_loss(pred, ground_truth, smoothing=True):
@@ -315,7 +315,7 @@ def sample_and_knn_group_(s, k, coords, features):
     coords = coords.contiguous()
 
     # FPS sampling
-    fps_idx = sample_farthest_points(coords,None, s).long()  # [B, s]
+    fps_idx = pointnet2_utils.furthest_point_sample(coords, s).long()  # [B, s]
     new_coords = index_points(coords, fps_idx)                         # [B, s, 3]
     new_features = index_points(features, fps_idx)                     # [B, s, D]
 
@@ -338,7 +338,7 @@ from random import randint
 from typing import List, Optional, Tuple, Union
 
 import torch
-from pytorch3d import _C
+#from pytorch3d import _C
 
 #from .utils import masked_gather
 
@@ -437,7 +437,7 @@ class Logger():
     def close(self):
         self.f.close()
 
-def sample_and_knn_group_(s, k, coords, features):
+def sample_and_knn_group_A(s, k, coords, features):
     """
     Sampling by FPS and grouping by KNN.
     Input:

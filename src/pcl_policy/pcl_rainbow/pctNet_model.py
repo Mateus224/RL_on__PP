@@ -170,8 +170,8 @@ class PCT_E(nn.Module):
         self.oa4 = OA(256) #MHeadOA(256)
 
         self.linear = nn.Sequential(
-            nn.Conv1d(1280, 1280, kernel_size=1, bias=False),
-            nn.BatchNorm1d(1280),
+            nn.Conv1d(1024, 1024, kernel_size=1, bias=False),
+            nn.BatchNorm1d(1024),
             nn.LeakyReLU(negative_slope=0.2)
         )
 
@@ -180,9 +180,9 @@ class PCT_E(nn.Module):
         x1 = self.oa1(x)
         x2 = self.oa2(x1)
         x3 = self.oa3(x2)
-        x4 = self.oa4(x3)
+        #x4 = self.oa4(x3)
 
-        x = torch.cat([x, x1, x2, x3, x4], dim=1)
+        x = torch.cat([x, x1, x2, x3], dim=1)
         x = self.linear(x)
         #c = nn.MaxPool1d(x.size(-1))(x)
         #c = c.view(-1, 1024)
@@ -688,20 +688,20 @@ class Policy2(nn.Module):
         self.action_space = actions
         self.atoms =args.atoms
 
-        self.convs1 = nn.Conv1d(2560, 1024, 1)
-        self.convs2 = nn.Conv1d(1024, 256, 1)
-        self.convs3 = nn.Conv1d(256, 64, 1)
+        self.convs1 = nn.Conv1d(576, 256, 1)
+        self.convs2 = nn.Conv1d(256, 128, 1)
+        self.convs3 = nn.Conv1d(128, 64, 1)
         #self.convs4 = nn.Conv1d(256, 128, 1)
 
         self.bns1 = nn.BatchNorm1d(256)
-        self.bns2 = nn.BatchNorm1d(64)
+        self.bns2 = nn.BatchNorm1d(128)
         #self.bns3 = nn.BatchNorm1d(128)
 
         self.fc1 = nn.Linear(65536, 512)
         self.fc2 = nn.Linear(519, 512)
 
-        self.fc_h_v = spectral_norm(nn.Linear(38400, 512))
-        self.fc_h_a = spectral_norm(nn.Linear(38400, 512))
+        self.fc_h_v = spectral_norm(nn.Linear(34560, 512))
+        self.fc_h_a = spectral_norm(nn.Linear(34560, 512))
         self.fc_z_v = NoisyLinear(512, self.atoms, std_init=args.noisy_std)
         self.fc_z_a = NoisyLinear(512, self.action_space * self.atoms, std_init=args.noisy_std)
 
@@ -742,7 +742,7 @@ class Multihead_PCT_RL(nn.Module):
     def __init__(self, args, actions):
         super().__init__()
     
-        self.encoder = PCT_E()
+        self.encoder = NeighborEmbedding_own()
         self.policy2 = Policy2(args, actions)
 
     def forward(self, x, position, log=False):

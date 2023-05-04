@@ -46,7 +46,7 @@ def parse():
     parser.add_argument('--exp_name', type=str, default = "", help='')
     parser.add_argument('--frame_width', type=int, default = 84, help='Resized frame width')
     parser.add_argument('--frame_height', type=int, default = 84, help='Resized frame height')
-    parser.add_argument('--num_steps', type=int, default = 2e6, help='Number of episodes the agent plays')
+    parser.add_argument('--num_steps', type=int, default = 3e6, help='Number of episodes the agent plays')
     parser.add_argument('--state_length', type=int, default = 4, help='Number of most recent frames to produce the input to the network')
     parser.add_argument('--gamma', type=float, default = 0.99, help='Discount factor')
     parser.add_argument('--exploration_steps', type=int, default =50000, help='Number of steps over which the initial value of epsilon is linearly annealed to its final value')#100000
