@@ -49,7 +49,7 @@ def init(args,env, agent,config):
                 done=False
                 timeout= False
             
-            action = agent.epsilon_greedy(T,500000, state)
+            action = agent.epsilon_greedy(T,300000, state)
             #print(action)
 
 

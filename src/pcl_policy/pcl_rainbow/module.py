@@ -254,9 +254,9 @@ class NeighborEmbedding_own(nn.Module):
         super(NeighborEmbedding_own, self).__init__()
 
         self.conv1 = nn.Conv1d(3, 96, kernel_size=1, bias=False)
-        self.conv2 = nn.Conv1d(64, 64, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(96, 96, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm1d(96)
-        self.bn2 = nn.BatchNorm1d(64)
+        self.bn2 = nn.BatchNorm1d(96)
 
         #self.sg0 = SG(s=400, in_channels=128, out_channels=256, k=32)
         #self.oa01 = OA(256)
@@ -267,7 +267,7 @@ class NeighborEmbedding_own(nn.Module):
         self.oa02 = OA(192)
         self.oa12 = OA(192)
         #self.oa12 = OA(256)
-        self.sg2 = SG(s=16, in_channels=384, out_channels=384, k=16)
+        self.sg2 = SG(s=32, in_channels=384, out_channels=384, k=32)
         self.oa03 = OA(384)
         self.oa13 = OA(384)
         
@@ -278,10 +278,10 @@ class NeighborEmbedding_own(nn.Module):
         self.oas2 =OA_2(192) 
         self.oa1 = OA(96)
         self.oa2 = OA(96)       
-        #self.oa31 = OA(256)  
-        #self.oa32 = OA(256)
-        #self.oa33 = OA(256)  
-        #self.oa34 = OA(256)
+        self.oa31 = OA(256)  
+        self.oa32 = OA(256)
+        self.oa33 = OA(96)  
+        self.oa34 = OA(96)
         self.linear0 = nn.Sequential(
             nn.Conv1d(96, 256, kernel_size=1, bias=True),
             nn.BatchNorm1d(256),
@@ -298,8 +298,8 @@ class NeighborEmbedding_own(nn.Module):
             nn.LeakyReLU(negative_slope=0.2)
         )
         self.linear = nn.Sequential(
-            nn.Conv1d(288, 288, kernel_size=1, bias=False),
-            nn.BatchNorm1d(288),
+            nn.Conv1d(480, 480, kernel_size=1, bias=False),
+            nn.BatchNorm1d(480),
             nn.LeakyReLU(negative_slope=0.2)
         )
     def forward(self, x):
@@ -310,26 +310,25 @@ class NeighborEmbedding_own(nn.Module):
         xyz = x.permute(0, 2, 1)  # [B, N ,3]
 
         x = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
-        x = F.relu(self.bn2(self.conv2(x))) # [B, 64, N]
+        x0 = F.relu(self.bn2(self.conv2(x))) # [B, 64, N]
         #x0=self.oa01(x)
         #xyz, features0, _ = self.sg0(features, xyz, k=16) 
         #features01=self.oa01(features0)
         xyz1, features1, batch_index_arr01 = self.sg1(x, xyz, k=32)         # [B, 128, 512]
-        features1=self.oa02(features1)
-        features1=self.oa12(features1)
-        xyz1, features2, batch_index_arr02 = self.sg2(features1, xyz1, k=16)         # [B, 128, 512]
-        features2=self.oa03(features2)
-        features2=self.oa13(features2)
+        #features1=self.oa02(features1)
+        #features1=self.oa12(features1)
+        xyz1, features2, batch_index_arr02 = self.sg2(features1, xyz1, k=32)         # [B, 128, 512]
+        #features2=self.oa03(features2)
+        #features2=self.oa13(features2)
         
         x = self.oas1(features2, features1)
-        x = self.oa04(x)
+        #x = self.oa04(x)
         x1 = self.oas2(x, x0)
         x2 = self.oa1(x1)
         x3 = self.oa2(x2)
-        #x3 = self.oa32(x2)
-        #x4 = self.oa33(x3)
-        #x5 = self.oa34(x4)
-        x = torch.cat([x1, x2, x3], dim=1)
+        x4 = self.oa33(x3)
+        x5 = self.oa34(x4)
+        x = torch.cat([x1, x2, x3, x4, x5], dim=1)
         x = self.linear(x)
         x_max = torch.max(x, dim=-1)[0]
 

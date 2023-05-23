@@ -688,7 +688,7 @@ class Policy2(nn.Module):
         self.action_space = actions
         self.atoms =args.atoms
 
-        self.convs1 = nn.Conv1d(576, 256, 1)
+        self.convs1 = nn.Conv1d(960, 256, 1)
         self.convs2 = nn.Conv1d(256, 128, 1)
         self.convs3 = nn.Conv1d(128, 64, 1)
         #self.convs4 = nn.Conv1d(256, 128, 1)
