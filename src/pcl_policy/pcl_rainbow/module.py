@@ -314,7 +314,7 @@ class NeighborEmbedding_own(nn.Module):
         #x0=self.oa01(x)
         #xyz, features0, _ = self.sg0(features, xyz, k=16) 
         #features01=self.oa01(features0)
-        xyz1, features1, batch_index_arr01 = self.sg1(x, xyz, k=32)         # [B, 128, 512]
+        xyz1, features1, batch_index_arr01 = self.sg1(x0, xyz, k=32)         # [B, 128, 512]
         #features1=self.oa02(features1)
         #features1=self.oa12(features1)
         xyz1, features2, batch_index_arr02 = self.sg2(features1, xyz1, k=32)         # [B, 128, 512]
