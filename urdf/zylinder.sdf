@@ -11,7 +11,7 @@
       <geometry>
         <cylinder>
           <!-- Radius and length provided by Velodyne -->
-          <radius>.34</radius>
+          <radius>.45</radius>
           <length>1.3</length>
         </cylinder>
       </geometry>

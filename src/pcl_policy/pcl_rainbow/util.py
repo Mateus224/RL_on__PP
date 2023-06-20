@@ -141,7 +141,7 @@ def sample_and_ball_group(s, radius, n, coords, features):
     return new_coords, aggregated_features  # [B, s, 3], [B, s, n, 2D]
 
 
-def sample_and_knn_group(s, k, coords, features):
+def knn_group(s, k, coords, features):
     """
     Sampling by FPS and grouping by KNN.
     Input:

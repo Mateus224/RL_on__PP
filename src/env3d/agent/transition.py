@@ -54,7 +54,8 @@ class Transition():
         self.header = std_msgs.msg.Header()
         self.header.stamp = rospy.Time.now()
         self.header.frame_id = 'world'
-
+        self.pcl_size=None
+        self.oracle=False
   
 
         self.tf_buffer = tf2_ros.Buffer()
@@ -150,6 +151,31 @@ class Transition():
         self.old_cloud=np.copy(pc_np_)
         self.global_pcl=np.concatenate((self.global_pcl, np.copy(pc_np)), axis=0)
         self.global_pcl=np.where(self.global_pcl<0.01,0.01,  self.global_pcl)
+        oracle=False
+
+
+        if oracle==True:
+            return self.oracle()
+        else:
+            return self.discriminator()
+        
+        
+    def discriminator(self):
+        pcl_state= np.zeros((3,self.pcl_size))
+        pc_pcl = pcl.PointCloud(np.array(self.global_pcl, dtype = np.float32))
+        self.pcd.points = o3d.utility.Vector3dVector(pc_pcl)
+        self.pcd = self.pcd.voxel_down_sample(voxel_size=0.49)        
+        self.header.stamp = rospy.Time.now()
+        pc2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points) 
+        self.pub.publish(pc2)
+        transformedPc2 = self.transform_cloud_toAgent(pc2)
+        transformedPc2.header.stamp = rospy.Time.now()
+        transformed_pcl = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(transformedPc2, remove_nans = True)
+        self.step+=1
+
+        return transformed_pcl, 0
+
+    def oracle(self):
         pc_pcl = pcl.PointCloud(np.array(self.global_pcl, dtype = np.float32))
 
         self.pcd.points = o3d.utility.Vector3dVector(pc_pcl)
@@ -193,9 +219,6 @@ class Transition():
         self.pcd = self.pcd.voxel_down_sample(voxel_size=0.86)
         self.pcd_np=np.copy(np.asarray(self.pcd.points))
 
-
-
-
         self.allT_objects=np.concatenate((self.np_objects, self.allT_objects),axis=0)
         self.objs.points = o3d.utility.Vector3dVector(self.allT_objects)
         self.objs = self.objs.voxel_down_sample(voxel_size=0.24)
@@ -208,12 +231,8 @@ class Transition():
 
         self.exp_reward = self.pcd_np.shape[0]
         self.exp_reward_diff = self.exp_reward - self.exp_old_reward
-        self.exp_old_reward = self.exp_reward
-        
-
+        self.exp_old_reward = self.exp_reward       
         self.reward=self.reward + (self.exp_reward_diff/2)
-
-
         self.pcd.points = o3d.utility.Vector3dVector(self.global_pcl)
         #self.objs = self.objs.voxel_down_sample(voxel_size=0.25)
         self.header.stamp = rospy.Time.now()
@@ -226,7 +245,7 @@ class Transition():
         transformed_pcl = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(transformedPc2, remove_nans = True)
 
         self.step+=1
-        return transformed_pcl
+        return transformed_pcl, 1
 
     def get_simulated_pcl(self):
         #self.pcd_sim=self.pcd
@@ -367,7 +386,7 @@ class Transition():
         broadcaster.sendTransform(static_transformStamped)
         self.scene.set_pose("UAV",self.position)
         #rospy.sleep(0.08)
-        pcl=self.get_pcl()
+        pcl, oracle=self.get_pcl()
         #rospy.sleep(0.08)
         pcl2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
         transformedPc2 = self.transform_cloud_toAgent(pcl2)
@@ -375,7 +394,7 @@ class Transition():
         #self.pub_agent.publish(transformedPc2)
         #rospy.sleep(0.2)
         transformed_pcl = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(transformedPc2, remove_nans = True)
-        return transformed_pcl, self.position
+        return transformed_pcl, self.position, oracle
 
 
 

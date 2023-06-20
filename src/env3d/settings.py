@@ -126,11 +126,11 @@ class Scene_settings():
         _obj=Pose()
         _obj.position.x = 50+i
         _obj.position.y = 50
-        _obj.position.z = 0
-        spawn_model_client = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
+        _obj.position.z = 1
+        spawn_model_client = rospy.ServiceProxy('/gazebo/spawn_urdf_model', SpawnModel)
         spawn_model_client(
         model_name='zylinder'+str(i),
-            model_xml=open('/home/matthias/catkin_ws/src/my_drone/urdf/zylinder.sdf', 'r').read(),
+            model_xml=open('/home/matthias/catkin_ws/src/my_drone/urdf/pyr.urdf', 'r').read(),
             robot_namespace='/zylinder',
             initial_pose=_obj,
             reference_frame='world'
@@ -140,7 +140,7 @@ class Scene_settings():
         _obj=Pose()
         _obj.position.x = 6.5
         _obj.position.y = -0.5+(i*14)
-        _obj.position.z = 0.65
+        _obj.position.z = 1
         spawn_model_client = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
         spawn_model_client(
         model_name='wall_x'+str(i),
@@ -154,7 +154,7 @@ class Scene_settings():
         _obj=Pose()
         _obj.position.x = -0.5+(i*14)
         _obj.position.y =  6.5
-        _obj.position.z = 0.65
+        _obj.position.z = 1
         spawn_model_client = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
         spawn_model_client(
         model_name='wall_y'+str(i),
@@ -168,7 +168,7 @@ class Scene_settings():
         _obj=Pose()
         _obj.position.x = 6
         _obj.position.y =  6
-        _obj.position.z = 0.65
+        _obj.position.z =1
         spawn_model_client = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
         spawn_model_client(
         model_name='wall_in_b',
@@ -182,7 +182,7 @@ class Scene_settings():
         _obj=Pose()
         _obj.position.x = 6
         _obj.position.y =  3
-        _obj.position.z = 0.65
+        _obj.position.z = 1
         spawn_model_client = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
         spawn_model_client(
         model_name='wall_in_s',
@@ -256,8 +256,8 @@ class Scene_settings():
         for i in range(35):
             position[0] = 50+i
             position[1] = 50
-            position[2] = 0
-            position[3] = 0.65
+            position[2] = 1
+            position[3] = 1
             self.set_pose(zylinder+str(i),position)            
         #env_2D= np.random.choice(2, 100, p=(0.98, 0.02))
         
@@ -294,8 +294,8 @@ class Scene_settings():
         for i in range (self.num_obj):
             position[0] = o_place[0][i]
             position[1] = o_place[1][i]
-            position[2] = 0
-            position[3] = 0.65
+            position[2] = 1
+            position[3] = 1
             self.set_pose(zylinder+str(i),position)
         agent="UAV"
         if pose== None:
@@ -310,7 +310,7 @@ class Scene_settings():
         else:
             self.pose_[0]=pose[0]
             self.pose_[1]=pose[1]
-        self.pose_[2]= 0.65
+        self.pose_[2]= 0.5
         
         self.quat = tf.transformations.quaternion_from_euler(
                    float(0),float(0),float(0))

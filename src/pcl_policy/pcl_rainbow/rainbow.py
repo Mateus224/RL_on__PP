@@ -29,7 +29,7 @@ class PCL_rainbow():
     self.Vmax = 400#args.V_max
     self.support = torch.linspace(self.Vmin, self.Vmax, self.atoms).to(device=args.device)  # Support (range) of z
     self.delta_z = (self.Vmax - self.Vmin) / (self.atoms - 1)
-    self.batch_size = 32 #args.batch_size
+    self.batch_size = 16 #args.batch_size
     self.n = 1#args.multi_step
     self.discount = 0.99 #args.discount
     #self.norm_clip = args.norm_clip

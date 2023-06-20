@@ -5,8 +5,10 @@ import random
 import rospy
 from env3d.settings import Scene_settings
 from env3d.agent.transition import Transition
-
+from pcl_policy.pcl_rainbow.discriminator.discriminator import NaivePCTSeg
 import time
+import torch
+import torch.nn as nn
 
 
 
@@ -14,8 +16,15 @@ class Env(object):
     def __init__(self,args,config):
         self.scene=Scene_settings(config)
         self.transition=Transition(config,self.scene)
+        self.pcl_size=1620
+        self.transition.pcl_size=self.pcl_size
+        self.transition.oracle=False
         self.config=config
-        self.pcl_size=540
+        device = "cuda"
+        self.model = NaivePCTSeg().to(device)
+        self.model = nn.DataParallel(self.model) 
+        self.model.load_state_dict(torch.load("pcl_policy/pcl_rainbow/discriminator/model.t7"))
+        self.model.eval()
 
         
 
@@ -29,7 +38,9 @@ class Env(object):
         self.transition.reset()
         self.old_pcl=np.zeros((1,3))
         state=[self.pcl, self.scene.quat_pose]
+        self.sum_reward=0
         self.points=0
+        self.sum_old_points=0
         return state 
 
 
@@ -41,24 +52,33 @@ class Env(object):
         terminate=False
         pcl_state= np.zeros((3,self.pcl_size))
         actions, i = self.transition.legal_transition(unsorted_actions)
-        pcl, pose = self.transition.make_action(actions[i])
+        pcl, pose, oracle = self.transition.make_action(actions[i])
         pcl=np.swapaxes(pcl,0,1)
         self.points=pcl.shape[1]
-        if pcl.shape[1]>539:
+        if pcl.shape[1]>1619:
             terminate=True
             print("too many points !!!", pcl.shape)
         else:
-            pcl_state[:,:pcl.shape[1]]=pcl
+            pcl_state[:,:pcl.shape[1]] =pcl
         state=[pcl_state, pose]
         #if state.shape[0]>512:
-
-        reward = self.transition.reward
-        #if self.old_pcl.shape[1] < pcl.shape[1]:
-        #    reward=pcl.shape[1]-self.old_pcl.shape[1]
-        #    reward = reward -  self.transition.diff
-        #    self.old_pcl=pcl
-        #else:
-        #    reward=0
+        if oracle:
+            reward = self.transition.reward
+        else:
+            #print(pcl_state.shape)
+            logits = self.model(torch.from_numpy(pcl_state).float().unsqueeze(0))
+            
+            preds = logits.max(dim=1)[1].numpy(force=True)
+            #print(preds)
+            sum_reward=np.sum(preds)
+            if self.sum_reward<sum_reward:
+                reward=sum_reward-self.sum_reward
+                self.sum_reward=sum_reward
+            else:
+                reward=0
+            if self.sum_old_points<pcl.shape[1]:
+                reward= reward + (0.5*(pcl.shape[1]-self.sum_old_points))
+                self.sum_old_points=pcl.shape[1]
         return state, reward, actions, i, terminate
 
 

@@ -1,0 +1,12 @@
+<?xml version='1.0'?>
+<sdf version="1.4">
+  <model name="pyr">
+    <pose>0 0 0. 0 0 0</pose>
+    <static>true</static>
+    <link name="link">
+        <geometry>
+     	<mesh filename="model://pyr.dae"/>
+        </geometry>
+    </link>
+  </model>
+</sdf>
