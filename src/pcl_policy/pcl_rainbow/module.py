@@ -138,7 +138,7 @@ class SG_knn(nn.Module):
         """
         x = x.permute(0, 2, 1)           # (B, N, in_channels//2)
 
-        new_feature = knn_group(s=1620, k=16, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
+        new_feature = knn_group(s=1620, k=32, coords=coords, features=x)  # [B, s, 3], [B, s, 32, in_channels]
 
         b, s, k, d = new_feature.size()
         new_feature = new_feature.permute(0, 1, 3, 2)
@@ -246,19 +246,19 @@ class NeighborEmbedding_own(nn.Module):
         x = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
         x0 = F.relu(self.bn2(self.conv2(x))) # [B, 64, N]
         #x0=self.oa01(x)
-        #x1 = self.sg0(x0, xyz) 
+        x1 = self.sg0(x0, xyz) 
         #features01=self.oa01(x0)
-        xyz1, features1, batch_index_arr01 = self.sg1(x0, xyz, k=32)         # [B, 128, 512]
+        #xyz1, features1, batch_index_arr01 = self.sg1(x0, xyz, k=32)         # [B, 128, 512]
         #features1=self.oa02(features1_)
         #features1=self.oa12(features1)
-        xyz1, features2, batch_index_arr02 = self.sg2(features1, xyz1, k=32)         # [B, 128, 512]
+        #xyz1, features2, batch_index_arr02 = self.sg2(features1, xyz1, k=32)         # [B, 128, 512]
         #features2=self.oa03(features2_)
         #features2=self.oa13(features2)
         
         #x = self.oas1(features2, features1)
         #x1 = self.oas2(x, x0)
-        x_b = torch.cat([features1, features2], dim=2)
-        x1 = self.oas3(x_b,x0)
+        #x_b = torch.cat([features1, features2], dim=2)
+        #x1 = self.oas3(x_b,x0)
         x2 = self.oa1(x1)
         x3 = self.oa2(x2)
         x4 = self.oa33(x3)

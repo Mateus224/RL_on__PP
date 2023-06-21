@@ -23,7 +23,7 @@ class Env(object):
         device = "cuda"
         self.model = NaivePCTSeg().to(device)
         self.model = nn.DataParallel(self.model) 
-        self.model.load_state_dict(torch.load("pcl_policy/pcl_rainbow/discriminator/model.t7"))
+        print(self.model.load_state_dict(torch.load("pcl_policy/pcl_rainbow/discriminator/model.t7")))
         self.model.eval()
 
         
@@ -67,8 +67,7 @@ class Env(object):
         else:
             #print(pcl_state.shape)
             logits = self.model(torch.from_numpy(pcl_state).float().unsqueeze(0))
-            
-            preds = logits.max(dim=1)[1].numpy(force=True)
+            preds = logits.max(dim=1)[1].cpu().numpy()
             #print(preds)
             sum_reward=np.sum(preds)
             if self.sum_reward<sum_reward:
