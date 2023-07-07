@@ -51,6 +51,9 @@ class Env(object):
         pcl=None
         terminate=False
         pcl_state= np.zeros((3,self.pcl_size))
+        oracle=True
+        if oracle==True:
+            pcl_state= np.zeros((4,self.pcl_size))
         actions, i = self.transition.legal_transition(unsorted_actions)
         pcl, pose, oracle = self.transition.make_action(actions[i])
         pcl=np.swapaxes(pcl,0,1)

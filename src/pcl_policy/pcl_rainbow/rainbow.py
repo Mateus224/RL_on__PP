@@ -26,14 +26,14 @@ class PCL_rainbow():
     self.action_space = 6#env.action_space()
     self.atoms = args.atoms
     self.Vmin = 0#args.V_min
-    self.Vmax = 400#args.V_max
+    self.Vmax = 1000#args.V_max
     self.support = torch.linspace(self.Vmin, self.Vmax, self.atoms).to(device=args.device)  # Support (range) of z
     self.delta_z = (self.Vmax - self.Vmin) / (self.atoms - 1)
-    self.batch_size = 16 #args.batch_size
+    self.batch_size = 32 #args.batch_size
     self.n = 1#args.multi_step
     self.discount = 0.99 #args.discount
     #self.norm_clip = args.norm_clip
-    self.norm_clip = 20
+    self.norm_clip = 200
     self.device=args.device
     #self.online_net = DQN(args, self.action_space).to(device=args.device)
     #self.online_net = PointNet(args, self.action_space).to(self.device)

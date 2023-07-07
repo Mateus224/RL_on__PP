@@ -38,7 +38,7 @@ class Scene_settings():
         if random_pose:
             self.pose_[0]= np.random.randint(13)+1
             self.pose_[1]= np.random.randint(13)+1
-            self.pose_[2]= 1
+            self.pose_[2]= 3
             self.quat = tf.transformations.quaternion_from_euler(
                    float(0),float(0),float(0))
 
@@ -310,7 +310,7 @@ class Scene_settings():
         else:
             self.pose_[0]=pose[0]
             self.pose_[1]=pose[1]
-        self.pose_[2]= 0.5
+        self.pose_[2]= 3
         
         self.quat = tf.transformations.quaternion_from_euler(
                    float(0),float(0),float(0))

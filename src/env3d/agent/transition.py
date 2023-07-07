@@ -55,7 +55,6 @@ class Transition():
         self.header.stamp = rospy.Time.now()
         self.header.frame_id = 'world'
         self.pcl_size=None
-        self.oracle=False
   
 
         self.tf_buffer = tf2_ros.Buffer()
@@ -74,7 +73,7 @@ class Transition():
         self.global_pcl=np.zeros((1,3))
         self.position= np.zeros((7))
         self.position[:3]=pose[:3]
-        self.position[2]=0.65
+        self.position[2]=1
         self.position[3]=1
         self.old_cloud=np.zeros((1,3))
         self.allT_objects=np.zeros((1,3))
@@ -150,12 +149,12 @@ class Transition():
         
         self.old_cloud=np.copy(pc_np_)
         self.global_pcl=np.concatenate((self.global_pcl, np.copy(pc_np)), axis=0)
-        self.global_pcl=np.where(self.global_pcl<0.01,0.01,  self.global_pcl)
-        oracle=False
+        #self.global_pcl=np.where(self.global_pcl<0.01,0.01,  self.global_pcl)
+        oracle=True
 
 
         if oracle==True:
-            return self.oracle()
+            return self.ask_oracle()
         else:
             return self.discriminator()
         
@@ -175,30 +174,31 @@ class Transition():
 
         return transformed_pcl, 0
 
-    def oracle(self):
+    def ask_oracle(self):
         pc_pcl = pcl.PointCloud(np.array(self.global_pcl, dtype = np.float32))
 
         self.pcd.points = o3d.utility.Vector3dVector(pc_pcl)
+        self.pcd=self.pcd.voxel_down_sample(voxel_size=0.49)
 
         o_place=np.where(self.scene.env_2D==1)
         o_place=np.array(o_place)
         #num_obj=o_place.shape[1]
         obj1_points = np.copy(np.asarray(self.pcd.points))
 
-        object1_mask0 = obj1_points[:,0] > o_place[0][0]-.35
-        object1_mask1 = obj1_points[:,0] < o_place[0][0]+.35
-        object1_mask2 = obj1_points[:,1] > o_place[1][0]-.35
-        object1_mask3 = obj1_points[:,1] < o_place[1][0]+.35
+        object1_mask0 = obj1_points[:,0] > o_place[0][0]-1
+        object1_mask1 = obj1_points[:,0] < o_place[0][0]+1
+        object1_mask2 = obj1_points[:,1] > o_place[1][0]-1
+        object1_mask3 = obj1_points[:,1] < o_place[1][0]+1
 
-        object2_mask0 = obj1_points[:,0] > o_place[0][1]-0.35
-        object2_mask1 = obj1_points[:,0] < o_place[0][1]+0.35
-        object2_mask2 = obj1_points[:,1] > o_place[1][1]-0.35
-        object2_mask3 = obj1_points[:,1] < o_place[1][1]+0.35
+        object2_mask0 = obj1_points[:,0] > o_place[0][1]-1
+        object2_mask1 = obj1_points[:,0] < o_place[0][1]+1
+        object2_mask2 = obj1_points[:,1] > o_place[1][1]-1
+        object2_mask3 = obj1_points[:,1] < o_place[1][1]+1
 
-        object3_mask0 = obj1_points[:,0] > o_place[0][2]-0.35
-        object3_mask1 = obj1_points[:,0] < o_place[0][2]+0.35
-        object3_mask2 = obj1_points[:,1] > o_place[1][2]-0.35
-        object3_mask3 = obj1_points[:,1] < o_place[1][2]+0.35
+        object3_mask0 = obj1_points[:,0] > o_place[0][2]-1
+        object3_mask1 = obj1_points[:,0] < o_place[0][2]+1
+        object3_mask2 = obj1_points[:,1] > o_place[1][2]-1
+        object3_mask3 = obj1_points[:,1] < o_place[1][2]+1
 
         object1_mask=np.all([object1_mask0,object1_mask1], axis=0)
         object1_mask=np.all([object1_mask,object1_mask2], axis=0)
@@ -214,27 +214,29 @@ class Transition():
 
         self.np_objects=np.concatenate((obj1_points[object1_mask],obj1_points[object2_mask]),axis=0)
         self.np_objects=np.concatenate((self.np_objects,obj1_points[object3_mask]),axis=0)
-        self.objs.points = o3d.utility.Vector3dVector(self.np_objects)
-
-        self.pcd = self.pcd.voxel_down_sample(voxel_size=0.86)
         self.pcd_np=np.copy(np.asarray(self.pcd.points))
+        ix = np.isin(self.pcd_np[:,0], self.np_objects[:,0]).astype(float)
 
-        self.allT_objects=np.concatenate((self.np_objects, self.allT_objects),axis=0)
-        self.objs.points = o3d.utility.Vector3dVector(self.allT_objects)
-        self.objs = self.objs.voxel_down_sample(voxel_size=0.24)
-        self.allT_objects=np.copy(np.asarray(self.objs.points))
-        self.global_pcl=np.concatenate((self.allT_objects,np.asarray(self.pcd.points)),axis=0)
+        #ix = np.sum(ix)
+        #print(ix,'asd')
+        #self.objs.points = o3d.utility.Vector3dVector(self.np_objects)
 
-        self.comulativ_reward= self.allT_objects.shape[0]
-        self.reward = self.comulativ_reward - self.comulativ_old_reward
-        self.comulativ_old_reward = self.comulativ_reward
+        #self.pcd = self.pcd.voxel_down_sample(voxel_size=0.49)
+        
 
-        self.exp_reward = self.pcd_np.shape[0]
-        self.exp_reward_diff = self.exp_reward - self.exp_old_reward
-        self.exp_old_reward = self.exp_reward       
-        self.reward=self.reward + (self.exp_reward_diff/2)
-        self.pcd.points = o3d.utility.Vector3dVector(self.global_pcl)
-        #self.objs = self.objs.voxel_down_sample(voxel_size=0.25)
+        #self.allT_objects=np.concatenate((self.np_objects, self.allT_objects),axis=0)
+        #self.objs.points = o3d.utility.Vector3dVector(self.allT_objects)
+        #self.objs = self.objs.voxel_down_sample(voxel_size=0.49)
+        
+        #print(discr)
+
+        #self.allT_objects=np.copy(np.asarray(self.objs.points))
+        #self.global_pcl=np.concatenate((self.allT_objects,np.asarray(self.pcd.points)),axis=0)
+        #self.pcd.points = o3d.utility.Vector3dVector(self.global_pcl)
+        #self.pcd = self.pcd.voxel_down_sample(voxel_size=0.49)
+        self.reward=0
+
+        #self.pcd.points = o3d.utility.Vector3dVector(self.objs)
         self.header.stamp = rospy.Time.now()
         pc2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
         
@@ -243,7 +245,7 @@ class Transition():
         transformedPc2 = self.transform_cloud_toAgent(pc2)
         transformedPc2.header.stamp = rospy.Time.now()
         transformed_pcl = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(transformedPc2, remove_nans = True)
-
+        transformed_pcl = np.column_stack((transformed_pcl,ix))
         self.step+=1
         return transformed_pcl, 1
 
@@ -388,14 +390,16 @@ class Transition():
         #rospy.sleep(0.08)
         pcl, oracle=self.get_pcl()
         #rospy.sleep(0.08)
-        pcl2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
-        transformedPc2 = self.transform_cloud_toAgent(pcl2)
-        transformedPc2.header.stamp = rospy.Time.now()
-        #self.pub_agent.publish(transformedPc2)
-        #rospy.sleep(0.2)
-        transformed_pcl = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(transformedPc2, remove_nans = True)
-        return transformed_pcl, self.position, oracle
-
+        if not oracle:
+            pcl2 = point_cloud2.create_cloud(self.header, self.fields, self.pcd.points)
+            transformedPc2 = self.transform_cloud_toAgent(pcl2)
+            transformedPc2.header.stamp = rospy.Time.now()
+            #self.pub_agent.publish(transformedPc2)
+            #rospy.sleep(0.2)
+            transformed_pcl = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(transformedPc2, remove_nans = True)
+            return transformed_pcl, self.position, oracle
+        else:
+            return pcl, self.position, oracle
 
 
 

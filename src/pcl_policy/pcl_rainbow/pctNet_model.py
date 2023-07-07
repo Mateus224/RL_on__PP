@@ -688,9 +688,9 @@ class Policy2(nn.Module):
         self.action_space = actions
         self.atoms =args.atoms
 
-        self.convs1 = nn.Conv1d(960, 256, 1)
-        self.convs2 = nn.Conv1d(256, 64, 1)
-        self.convs3 = nn.Conv1d(64, 16, 1)
+        self.convs1 = nn.Conv1d(960, 512, 1)
+        self.convs2 = nn.Conv1d(512, 256, 1)
+        self.convs3 = nn.Conv1d(256, 64, 1)
         #self.convs4 = nn.Conv1d(256, 128, 1)
 
         self.bns1 = nn.BatchNorm1d(512)
@@ -700,8 +700,8 @@ class Policy2(nn.Module):
         self.fc1 = nn.Linear(65536, 512)
         self.fc2 = nn.Linear(519, 512)
 
-        self.fc_h_v = spectral_norm(nn.Linear(25920, 512))
-        self.fc_h_a = spectral_norm(nn.Linear(25920, 512))
+        self.fc_h_v = spectral_norm(nn.Linear(103680, 512))
+        self.fc_h_a = spectral_norm(nn.Linear(103680, 512))
         self.fc_z_v = NoisyLinear(512, self.atoms, std_init=args.noisy_std)
         self.fc_z_a = NoisyLinear(512, self.action_space * self.atoms, std_init=args.noisy_std)
 

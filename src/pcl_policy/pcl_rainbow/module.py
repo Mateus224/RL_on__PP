@@ -187,16 +187,16 @@ class NeighborEmbedding_own(nn.Module):
     def __init__(self, samples=[256, 128, 64]):
         super(NeighborEmbedding_own, self).__init__()
 
-        self.conv1 = nn.Conv1d(3, 96, kernel_size=1, bias=False)
-        self.conv2 = nn.Conv1d(96, 96, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(96)
-        self.bn2 = nn.BatchNorm1d(96)
+        self.conv1 = nn.Conv1d(3, 48, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(48, 48, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm1d(48)
+        self.bn2 = nn.BatchNorm1d(48)
 
-        self.sg0 = SG_knn(s=1620, in_channels=192, out_channels=96)
+        self.sg0 = SG_knn(s=1620, in_channels=96, out_channels=96)
         #self.oa01 = OA(256)
         #self.oa02 = OA(256)
-        self.oa01 = OA(256)
-        self.oa11 = OA(256)
+        self.oa01 = OA(96)
+        self.oa11 = OA(96)
         self.sg1 = SG(s=256, in_channels=192, out_channels=96, k=32)
         self.oa02 = OA_(256)
         self.oa12 = OA(192)
@@ -205,15 +205,15 @@ class NeighborEmbedding_own(nn.Module):
         self.oa13 = OA(384)
         
 
-        self.oas1 =OA_2(256)
+        self.oas1 =OA_2(96)
         self.oa04 = OA(128)
         self.oa14 = OA(128)
-        self.oas2 =OA_2(256) 
+        self.oas2 =OA_2(96) 
         self.oas3 =OA_2(192)
         self.oa1 = OA(96)
         self.oa2 = OA(96)       
-        self.oa31 = OA(96)  
-        self.oa32 = OA(96)
+        self.oa31 = OA(256)  
+        self.oa32 = OA(256)
         self.oa33 = OA(96)  
         self.oa34 = OA(96)
         self.linear0 = nn.Sequential(

@@ -13,8 +13,9 @@ import torch
 import plotly
 from plotly.graph_objs import Scatter
 from plotly.graph_objs.scatter import Line
+import pickle
 
-
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:2048"
 
 
 def init(args,env, agent,config):
@@ -32,6 +33,7 @@ def init(args,env, agent,config):
         T, t, done = 0, 0, False
         sum_reward=0
         state = env.reset()
+        mem_list=[]
         for T in trange(1,int(args.num_steps)):#int(args.num_steps)):
             t=t+1
             if done:
@@ -63,14 +65,22 @@ def init(args,env, agent,config):
             sum_reward=sum_reward+reward
             #print("reward:",reward, sum_reward)
                 # Append transition to memory
-
+            
             # Train and test
-            if i>0:
-                for j in range(i-1):
-                    mem.append(state, actions[j], 0, True)
-            #print(state[0].shape)
-            mem.append(state, actions[i], reward, done) 
-            if T >= 40:#args.learn_start:
+            oracle=True
+            if oracle==False:
+                if i>0:
+                    for j in range(i-1):
+                        mem.append(state, actions[j], 0, True)
+
+                mem.append(state, actions[i], reward, done) 
+            else:
+                mem_list.append(next_state[0])
+
+            if T>50000:
+                with open('train_new_dataset2m_1mAgent.pkl', 'wb') as f:
+                    pickle.dump(mem_list, f)
+            if T >= 2000000:#args.learn_start:
                 mem.priority_weight = min(mem.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
 
                 agent.learn(mem)  # Train with n-step distributional double-Q learning
